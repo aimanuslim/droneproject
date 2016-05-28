@@ -21,7 +21,7 @@ radio.setChannel(0x76)
 # better range with lower transfer rate)
 radio.setDataRate(NRF24.BR_1MBPS)
 
-radio.setPALevel(NRF24.PA_MIN)
+radio.setPALevel(NRF24.PA_MAX)
 
 radio.setAutoAck(True)
 radio.enableDynamicPayloads()
@@ -32,41 +32,24 @@ radio.printDetails()
 
 #start listening to incoming messages
 radio.startListening()
-allowedSelections = ["coffee","tea","milo","coke"]
 
 while True:
-    ackPayLoad = [1]
-    while not radio.available(0):
-        time.sleep(1/100)
+	while not radio.available(0):
+        	time.sleep(1/100)
 
 
-    receivedMessage = []
-    radio.read(receivedMessage, radio.getDynamicPayloadSize())
+	receivedMessage = []
+	radio.read(receivedMessage, radio.getDynamicPayloadSize())
 
-    print("Received: {}".format(receivedMessage))
+	print("Received: {}".format(receivedMessage))
 
-    print("translating our received Message into unicode characters...")
+	print("translating our received Message into unicode characters...")
 
-    #Decode into standard unicode set
-    selection = ""
+	#Decode into standard unicode set
+	string = ""
 
-    for n in receivedMessage:
-        if (n >= 32 and n<= 126):
-            selection += chr(n)
+	for n in receivedMessage:
+		if (n >= 32 and n<= 126):
+        		string += chr(n)
 
-    print("Drink selected : {}".format(selection))
-    #radio.writeAckPayload(1,ackPayLoad,len(ackPayLoad))
-
-"""
-    if (selection in allowedSelections):
-        pathToImg = "/home/pi/Documents/drone_receiver/img_src/" + selection + ".jpg"
-        command = "sudo timeout 3s feh -ZF " + pathToImg
-        os.system(command)
-    #    time.sleep(3)
-        os.system("sudo pkill feh")
-
-    else:
-        print("No such drinks available")
-        
-    #print ("Loaded payload reply of {}".format(ackPayLoad))
-"""
+	print("Message decodes to : {}".format(string))
