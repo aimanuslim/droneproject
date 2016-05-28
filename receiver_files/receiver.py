@@ -28,20 +28,20 @@ class RadioClass():
 		self.radio.enableDynamicPayloads()
 		self.radio.enableAckPayload()
 
-		self.radio.openReadingPipe(1,pipes[1])
+		self.radio.openReadingPipe(1,self.pipes[1])
 		self.radio.printDetails()
 
 		#start listening to incoming messages
 		self.radio.startListening()
 
-	def getOrders():
+	def getOrders(self):
 		while True:
 			while not self.radio.available(0):
-        		time.sleep(1/100)
+        			time.sleep(1/100)
 
 
 			self.receivedMessage = []
-			self.radio.read(receivedMessage, self.radio.getDynamicPayloadSize())
+			self.radio.read(self.receivedMessage, self.radio.getDynamicPayloadSize())
 
 			print("Received: {}".format(self.receivedMessage))
 
@@ -52,9 +52,9 @@ class RadioClass():
 
 			for n in self.receivedMessage:
 				if (n >= 32 and n<= 126):
-        			self.string += chr(n)
+        				self.stringMessage += chr(n)
 
-			print("Message decodes to : {}".format(self.string))
+			print("Message decodes to : {}".format(self.stringMessage))
 
 piRadio = RadioClass()
 piRadio.getOrders()
