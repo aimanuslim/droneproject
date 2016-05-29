@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 import time
-#import spidev
+import spidev
 import os
 import wx
 import Queue
 import wx.grid as gridlib
 from threading import Thread
-#from lib_nrf24 import NRF24
-from wx.lib.pubsub import Publisher
+from lib_nrf24 import NRF24
+#from wx.lib.pubsub import Publisher
 
-#GPIO.setmode(GPIO.BCM)
-#GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
 
 def main():
 	app = PhotoCtrl()
@@ -54,7 +54,6 @@ class RadioThread(Thread):
 	
 	def run(self):
 		while True:
-			print("Radio Radio Radio")
 			time.sleep(1)
 			
 			while not self.radio.available(0):
@@ -76,8 +75,6 @@ class RadioThread(Thread):
         				self.stringMessage += chr(n)
 
 			print("Message decodes to : {}".format(self.stringMessage))
-			self.stringMessage = self.stringMessage[:-1]
-			print("Message -1 : {}".format(self.stringMessage))
 			self.messageQueue.put(self.stringMessage)
 			
 
