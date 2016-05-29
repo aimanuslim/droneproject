@@ -152,11 +152,14 @@ class MyFrame(wx.Frame):
 
 	def onOrderReceived(self,message):
 		# Parse the order string
-		print("onOrderReceived/ Order is : {}".format(message))
 		orderList = self.getListOfOrder(message)
 
 		#update currentPanel
+		for panel in self.orderPanels:
+			panel.SetBackgroundColour(wx.BLUE)
+
 		self.orderPanels[self.currentPanel].orderInfo.SetLabel(orderList)
+		self.orderPanels[self.currentPanel].SetBackgroundColour(wx.RED)
 		self.orderPanels[self.currentPanel].orderNumberInfo.SetLabel("# " + str(self.currentOrder))
 
 		self.currentOrder = self.currentOrder + 1
