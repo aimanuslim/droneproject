@@ -9,7 +9,7 @@ import Queue
 import wx.grid as gridlib
 from threading import Thread
 #from lib_nrf24 import NRF24
-from wx.lib.pubsub import Publisher
+from wx.lib.pubsub import pub
 import wx.lib.agw.fourwaysplitter as fws
 """
 GPIO.setmode(GPIO.BCM)
@@ -92,7 +92,7 @@ class RadioThread(Thread):
 			"""
 
 
-			Publisher().sendMessage("update panel",self.messageQueue.get())
+			wx.CallAfter(pub.sendMessage,"update panel",message = self.messageQueue.get())
 
 
 class OrderPanel(wx.Panel):
@@ -104,6 +104,7 @@ class OrderPanel(wx.Panel):
 		self.distanceFromSide = 10;
 		self.distanceFromPanelInfo = 50
 		self.panelInfoFont = wx.Font(self.fontSize,wx.SWISS,wx.NORMAL,wx.BOLD,underline=True)
+		self.orderInfoFont = wx.Font(self.fontSize,wx.SWISS,wx.NORMAL,wx.BOLD)
 
 		self.panelInfo = wx.StaticText(self,-1, "ORDER PANEL " + str(count),pos=(self.distanceFromSide,self.distanceFromTop))
 		self.panelInfo.SetForegroundColour(wx.WHITE)
@@ -115,7 +116,7 @@ class OrderPanel(wx.Panel):
 		
 		newDistance = self.distanceFromTop + self.distanceFromPanelInfo + self.fontSize
 		self.orderInfo = wx.StaticText(self,-1, "", pos=(self.distanceFromSide,newDistance))
-		self.orderInfo.SetFont(self.panelInfoFont)
+		self.orderInfo.SetFont(self.orderInfoFont)
 		self.orderInfo.SetForegroundColour(wx.WHITE)
 
 		self.SetBackgroundColour(self.color)
@@ -134,7 +135,7 @@ class MyFrame(wx.Frame):
 		self.color = wx.BLUE
 
 		print("Subscribing.....")
-		Publisher().subscribe(self.onOrderReceived,('update panel'))
+		pub.subscribe(self.onOrderReceived,"update panel")
 		print("Subscribed to updatePanels")
 
 		print("Starting RadioThread")
@@ -159,10 +160,10 @@ class MyFrame(wx.Frame):
 
 		return orderList.rstrip()
 
-	def onOrderReceived(self,msg):
+	def onOrderReceived(self,message):
 		# Parse the order string
-		print("onOrderReceived/ Order is : {}".format(msg))
-		orderList = self.getListOfOrder(msg)
+		print("onOrderReceived/ Order is : {}".format(message))
+		orderList = self.getListOfOrder(message)
 
 		#update currentPanel
 		self.orderPanels[self.currentPanel].orderInfo.SetLabel(orderList)
