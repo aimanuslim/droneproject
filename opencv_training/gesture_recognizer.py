@@ -18,7 +18,8 @@ history = 500
 complexityReductionThreshold = 0.02
 bufferLength = 80
 typicalDistance = 1000000
-intervals = 3
+intervals = 5
+scale = 1000
 
 import cv2
 import numpy as np
@@ -211,81 +212,50 @@ def videoRW(videoFileName):
     capturer = cv2.VideoCapture(videoFileName)
     fps = capturer.get(cv2.CAP_PROP_FPS)
     framect = capturer.get(cv2.CAP_PROP_FRAME_COUNT)
-    # print "Frames: {0} FPS: {1} Length: {2} s".format(framect, fps, framect / fps)
     print("Frames: ", framect," FPS: ", fps, " Length: ", framect / fps, " s")
 
     backgroundSubtractor = cv2.createBackgroundSubtractorMOG2(history=history)
     backgroundSubtractor.setComplexityReductionThreshold(complexityReductionThreshold)
     backgroundSubtractor.setBackgroundRatio(backgroundRatio)
 
+    out = open("mov.txt", 'w')
+
+
     center = None
     lastCenter = center
+    lastSpeed = 0
     minDistance = 1000000
     maxDistance = 0
 
     i = 0
     while(True):
         ret, frame = capturer.read()
+        framenum = capturer.get(cv2.CAP_PROP_POS_FRAMES)
         if( ret == 0 ): 
             capturer.release()
-            out.release()
+            out.close()
             return
         fgmask = backgroundSubtractor.apply(frame)
-        # print("Frame number: ", capturer.get(cv2.CAP_PROP_POS_FRAMES))
-    # if(capturer.get(cv2.CAP_PROP_POS_FRAMES)  > frameToInspect and capturer.get(cv2.CAP_PROP_POS_FRAMES)  > (frameToInspect + 2)): 
-        # histr = cv2.calcHist([fgmask],[0],None,[256],[0,256])
-        # minVal, maxVal, _, _ = cv2.minMaxLoc(histr) 
-        # print("minVal for {} is {}, maxVal for {} is {}".format(0, minVal, 0, maxVal))
+    
 
         drawnOriginal, drawnMasked, center = gestureRecognize(frame, fgmask)
 
         d = 0
-        if(lastCenter != None):
-                d = distance(center, lastCenter) 
+        s = 0
+        if(lastCenter != None and center != (0,0)):
+                d = distance(center, lastCenter)
+                d = d / scale  # scale
+                t = (intervals / fps)
+                s = d / t
+                lastSpeed = s
+        else: s = lastSpeed
         if(i % intervals == 0 and center != (0,0)):
             lastCenter = center
 
+
+
         i += 1
-        # if(centerFIFO == None): 
-        #     if(center != (0,0)): centerFIFO = [center for i in range(0,bufferLength)]
-        # else: 
-        #     if(center != (0,0)): centerFIFO = centerFIFO[1:bufferLength]+ [center]
-
-        # fd = 0
-        # if(centerFIFO != None):
-        #     maxDistance = 0
-        #     d = 0
-        #     for i, p1 in enumerate(centerFIFO):
-        #             d = distance(p1, center)
-        #             if(d > typicalDistance * 0.7): 
-        #                 fd = abs(bufferLength - i)
-        #                 maxDistance = d
-                        # if(d > 1500000 and fd > 50): 
-                        #     pass
-                        #     # print("Distance moved: {} Frame distance: {} Current frame: {}".format(d, fd, capturer.get(cv2.CAP_PROP_POS_FRAMES)))
-
-
-
-
-
-        # if(avgDist > 250000):
-        #     print("Movement detected")
-        # else: print("Average distance {}".format(avgDist))
-
-        # print("Average distance {}".format(avgDist))
-
-
-
-
-        # cv2.namedWindow("Original", cv2.WINDOW_NORMAL)
-        # frame = cv2.resize(frame, (WIDTH,HEIGHT))
-        # cv2.moveWindow("Original", 500, 400)
-        # cv2.resizeWindow("Original", WIDTH, HEIGHT)
-        
-        # cv2.namedWindow("Mask", cv2.WINDOW_NORMAL)
-        # fgmask = cv2.resize(fgmask, (WIDTH,HEIGHT))
-        # cv2.moveWindow("Mask", 100, 400)
-        # cv2.resizeWindow("Mask", WIDTH, HEIGHT)
+  
 
         cv2.namedWindow("Original", cv2.WINDOW_NORMAL)
         drawnOriginal = cv2.resize(drawnOriginal, (WIDTH,HEIGHT))
@@ -299,11 +269,20 @@ def videoRW(videoFileName):
 
 
         waitTime = 1
-        cv2.putText(drawnMasked, "d: {}".format(d), ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+        cv2.putText(drawnMasked, "s: {}".format(int(s)), ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
 
-        cv2.putText(drawnMasked, "lastCenter: {}".format(lastCenter), ((WIDTH - 200), (HEIGHT - 200)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+        cv2.putText(drawnMasked, "lastCenter: {}".format(lastCenter), ((WIDTH - 200), (HEIGHT - 150)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
 
-        cv2.putText(drawnMasked, "center: {}".format(center), ((WIDTH - 200), (HEIGHT - 300)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+        cv2.putText(drawnMasked, "frame: {}".format(math.floor(framenum)), ((WIDTH - 200), (HEIGHT - 200)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+
+
+        moveColor = (s / 2000) * 255
+        cv2.putText(drawnOriginal, "MOVED!" if (s > 600) else "", ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,moveColor), 2)
+
+
+
+        out.write("{},{}\n".format(s,math.floor(framenum)))
+
 
 
         # cv2.imshow("Original", frame)
@@ -322,7 +301,7 @@ def videoRW(videoFileName):
 
         # showImg("FG", fgmask)
 
-    capturer.release()
+
 
 
     
