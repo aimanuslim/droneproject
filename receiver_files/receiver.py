@@ -7,49 +7,54 @@ import os
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 
-#addresses for communication with transmitter
-pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
+class RadioClass():
+	def __init__(self):
+		#addresses for communication with transmitter
+		self.pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
+		self.radio = NRF24(GPIO, spidev.SpiDev())
+		self.receivedMessage = []
+		self.stringMessage = ""
+		#arguments are (CSN,CE) pins
+		self.radio.begin(0,17)
+		self.radio.setPayloadSize(32)
+		self.radio.setChannel(0x76)
 
-radio = NRF24(GPIO, spidev.SpiDev())
+		# better range with lower transfer rate)
+		self.radio.setDataRate(NRF24.BR_1MBPS)
 
-#arguments are (CSN,CE) pins
-radio.begin(0,17)
+		self.radio.setPALevel(NRF24.PA_MAX)
 
-radio.setPayloadSize(32)
-radio.setChannel(0x76)
+		self.radio.setAutoAck(True)
+		self.radio.enableDynamicPayloads()
+		self.radio.enableAckPayload()
 
-# better range with lower transfer rate)
-radio.setDataRate(NRF24.BR_1MBPS)
+		self.radio.openReadingPipe(1,pipes[1])
+		self.radio.printDetails()
 
-radio.setPALevel(NRF24.PA_MAX)
+		#start listening to incoming messages
+		self.radio.startListening()
 
-radio.setAutoAck(True)
-radio.enableDynamicPayloads()
-radio.enableAckPayload()
-
-radio.openReadingPipe(1,pipes[1])
-radio.printDetails()
-
-#start listening to incoming messages
-radio.startListening()
-
-while True:
-	while not radio.available(0):
-        	time.sleep(1/100)
+	def getOrders():
+		while True:
+			while not self.radio.available(0):
+        		time.sleep(1/100)
 
 
-	receivedMessage = []
-	radio.read(receivedMessage, radio.getDynamicPayloadSize())
+			self.receivedMessage = []
+			self.radio.read(receivedMessage, self.radio.getDynamicPayloadSize())
 
-	print("Received: {}".format(receivedMessage))
+			print("Received: {}".format(self.receivedMessage))
 
-	print("translating our received Message into unicode characters...")
+			print("translating our received Message into unicode characters...")
 
-	#Decode into standard unicode set
-	string = ""
+			#Decode into standard unicode set
+			self.stringMessage = ""
 
-	for n in receivedMessage:
-		if (n >= 32 and n<= 126):
-        		string += chr(n)
+			for n in self.receivedMessage:
+				if (n >= 32 and n<= 126):
+        			self.string += chr(n)
 
-	print("Message decodes to : {}".format(string))
+			print("Message decodes to : {}".format(self.string))
+
+piRadio = RadioClass()
+piRadio.getOrders()
