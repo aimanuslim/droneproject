@@ -16,7 +16,9 @@ frameToInspect = 250
 backgroundRatio = 0.4
 history = 500
 complexityReductionThreshold = 0.02
-
+bufferLength = 80
+typicalDistance = 1000000
+intervals = 3
 
 import cv2
 import numpy as np
@@ -90,7 +92,7 @@ def  gestureRecognize(ori, mask):
 
     # showImg("contour after", img)
 
-    if(len(contours) == 0): return center, ori, openedMask 
+    if(len(contours) == 0): return ori, openedMask, (0,0)
 
     # find contour with largest area (may not be necessary)
     max_area = 0
@@ -100,6 +102,10 @@ def  gestureRecognize(ori, mask):
         if(area > max_area):
             max_area = area
             indexOfLargestContour = i
+
+    if(max_area < 10000): return ori, openedMask, (0,0)
+    # else: print("max_area {}".format(max_area))
+
     largestContour = contours[indexOfLargestContour]
     convexHull = cv2.convexHull(largestContour)
 
@@ -142,7 +148,7 @@ def  gestureRecognize(ori, mask):
     distanceList = []
 
     i = 0
-    if(convexityDefects == None or len(convexityDefects) == 0): return ori, openedMask
+    if(convexityDefects == None or len(convexityDefects) == 0): return ori, openedMask, center
 
     for i in range(convexityDefects.shape[0]):
         startingDefectidx, endingDefectidx, farthestPtfromconvexHullidx, defectDistance = convexityDefects[i, 0]
@@ -186,7 +192,7 @@ def  gestureRecognize(ori, mask):
             cv2.circle(openedMask, f, 5, [0,0,255], -1)
         if(findAngle(f,s,e) < maxAngle): totalFingers += 1
 
-    return center, ori, openedMask
+    return ori, openedMask, center
 
     # TODO:
     # do motion gesture detection, check if hand has moved fast enough
@@ -194,7 +200,12 @@ def  gestureRecognize(ori, mask):
     # print "Fingers count: {0}".format(totalFingers)
     # showImg("Convex hull and contour", rgbMask)
 
-
+def distance(pt1, pt2):
+    # print(pt1)
+    # print(pt2)
+    d = abs(pt1[0] - pt2[0])**2 +  abs(pt1[1] - pt2[1])**2
+    m = math.sqrt(d)
+    return d
 
 def videoRW(videoFileName):
     capturer = cv2.VideoCapture(videoFileName)
@@ -209,7 +220,10 @@ def videoRW(videoFileName):
 
     center = None
     lastCenter = center
+    minDistance = 1000000
+    maxDistance = 0
 
+    i = 0
     while(True):
         ret, frame = capturer.read()
         if( ret == 0 ): 
@@ -222,7 +236,45 @@ def videoRW(videoFileName):
         # histr = cv2.calcHist([fgmask],[0],None,[256],[0,256])
         # minVal, maxVal, _, _ = cv2.minMaxLoc(histr) 
         # print("minVal for {} is {}, maxVal for {} is {}".format(0, minVal, 0, maxVal))
+
         drawnOriginal, drawnMasked, center = gestureRecognize(frame, fgmask)
+
+        d = 0
+        if(lastCenter != None):
+                d = distance(center, lastCenter) 
+        if(i % intervals == 0 and center != (0,0)):
+            lastCenter = center
+
+        i += 1
+        # if(centerFIFO == None): 
+        #     if(center != (0,0)): centerFIFO = [center for i in range(0,bufferLength)]
+        # else: 
+        #     if(center != (0,0)): centerFIFO = centerFIFO[1:bufferLength]+ [center]
+
+        # fd = 0
+        # if(centerFIFO != None):
+        #     maxDistance = 0
+        #     d = 0
+        #     for i, p1 in enumerate(centerFIFO):
+        #             d = distance(p1, center)
+        #             if(d > typicalDistance * 0.7): 
+        #                 fd = abs(bufferLength - i)
+        #                 maxDistance = d
+                        # if(d > 1500000 and fd > 50): 
+                        #     pass
+                        #     # print("Distance moved: {} Frame distance: {} Current frame: {}".format(d, fd, capturer.get(cv2.CAP_PROP_POS_FRAMES)))
+
+
+
+
+
+        # if(avgDist > 250000):
+        #     print("Movement detected")
+        # else: print("Average distance {}".format(avgDist))
+
+        # print("Average distance {}".format(avgDist))
+
+
 
 
         # cv2.namedWindow("Original", cv2.WINDOW_NORMAL)
@@ -237,7 +289,7 @@ def videoRW(videoFileName):
 
         cv2.namedWindow("Original", cv2.WINDOW_NORMAL)
         drawnOriginal = cv2.resize(drawnOriginal, (WIDTH,HEIGHT))
-        cv2.moveWindow("Original", 300, 100)
+        cv2.moveWindow("Original", 30, 100)
         cv2.resizeWindow("Original", WIDTH, HEIGHT)
 
         cv2.namedWindow("Result", cv2.WINDOW_NORMAL)
@@ -246,15 +298,22 @@ def videoRW(videoFileName):
         cv2.resizeWindow("Result", WIDTH, HEIGHT)
 
 
+        waitTime = 1
+        cv2.putText(drawnMasked, "d: {}".format(d), ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+
+        cv2.putText(drawnMasked, "lastCenter: {}".format(lastCenter), ((WIDTH - 200), (HEIGHT - 200)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+
+        cv2.putText(drawnMasked, "center: {}".format(center), ((WIDTH - 200), (HEIGHT - 300)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+
+
         # cv2.imshow("Original", frame)
         # cv2.imshow("Mask", fgmask)
         cv2.imshow("Result", drawnMasked)
         cv2.imshow("Original", drawnOriginal)
-        if(cv2.waitKey(1) == 27): exit()
-        if(cv2.waitKey(1) == 70): cv2.waitKey(0)
+        if(cv2.waitKey(waitTime) == 27): exit()
+        if(cv2.waitKey(waitTime) == 70): cv2.waitKey(0)
 
 
-        lastCenter = center
         # print("{}".format(result.shape))
         
         # color = ('b','g','r')
@@ -264,7 +323,9 @@ def videoRW(videoFileName):
         # showImg("FG", fgmask)
 
     capturer.release()
-    out.release()
+
+
+    
 
 
 
