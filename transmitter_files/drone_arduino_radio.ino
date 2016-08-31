@@ -34,9 +34,6 @@ void loop() {
 	if (Serial.available() > 0) {
 		String receivedMessage = Serial.readString();
 
-		Serial.print("The received string is: ");
-		Serial.println(receivedMessage);
-
 		if (receivedMessage.equals("xxxx")) {
 			digitalWrite(SPEAKER,HIGH);
 			delay(50);

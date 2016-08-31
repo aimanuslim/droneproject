@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 import glob
 import os
@@ -63,26 +64,35 @@ class RadioThread(Thread):
 		Thread.__init__(self)
 
 		print("Creating my Arduino object...............")
-		
+
 		self.serialPort = glob.glob("/dev/ttyUSB*")[0]
-		print("On port {}".format(self.serialPort))
 		self.baudRate = 9600
 		
 		# Establish serial connection with Arduino
-		print("Initiating serial port")
+		print("Initiating serial port connection")
 		self.arduinoSerial = serial.Serial(self.serialPort,self.baudRate)
 		
 		# Testing connection
 		# Upon successful connection, Arduino will give out 3 short beeps
-		print("Testing serial connection")
+		# and return "OK"
+		print("Testing serial connection.....")
 		time.sleep(3)
 		self.arduinoSerial.write("xxxx")
-		time.sleep(2)
 
+		# Test to see if Arduino returns "OK" to acknowledge connection
+		print("Waiting for reply from arduino.....")
+		time.sleep(2)
+		reply = self.arduinoSerial.readline().rstrip()
+		
+		if reply == "OK":
+			print("SUCCESS. Serial connection with Arduino on {} with speed {}".format(self.serialPort,self.baudRate))
+
+		else:
+			print("FAIL. Serial connection with Arduino on {} with speed {}".format(self.serialPort,self.baudRate))
 		self.start()
 
 	def run(self):
-		print("Running Arduino on Serial")
+		print("Arduino is listening on serial.")
 
 	def writeToArduino(self, msg):
 
