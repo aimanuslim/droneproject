@@ -43,7 +43,7 @@ class GestureThread(Thread):
 		"""
 
 		for i in range(1,1000):
-			time.sleep(0.5)
+			time.sleep(1)
 			print("Gesture Thread # {}. Modulo by 5 is {}".format(i, i % 5))
 
 			if (i%5) == 0:
@@ -104,6 +104,7 @@ class RadioThread(Thread):
 class ViewerPanel(wx.Panel):
 
     def __init__(self, parent):
+    	time.sleep(3)
         wx.Panel.__init__(self, parent)
         
         width, height = wx.DisplaySize()
@@ -115,19 +116,17 @@ class ViewerPanel(wx.Panel):
         self.arduino = RadioThread()
 
         Publisher().subscribe(self.updateImages, ("update images"))
-        print("subscribed to updateImages")
+        print("Subscribed to updateImages")
         Publisher().subscribe(self.nextPicture,("next picture"))
-        print("subscribed to nextPicture")
+        print("Subscribed to nextPicture")
         Publisher().subscribe(self.previousPicture,("previous picture"))
-        print("subscribed to prevPicture")
+        print("Subscribed to prevPicture")
         Publisher().subscribe(self.selectPicture,("select picture"))
-        print("subscribed to selectPicture")
+        print("Subscribed to selectPicture")
         Publisher().subscribe(self.unselectPicture,("unselect picture"))
-        print("subscribed to unselectPicture")
+        print("Subscribed to unselectPicture")
         Publisher().subscribe(self.sendOrder,("send order"))
-        print("subscribed to sendOrder")
-        
-        time.sleep(3)
+        print("Subscribed to sendOrder")
         self.layout()
         
     #----------------------------------------------------------------------
