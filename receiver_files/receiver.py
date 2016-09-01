@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 import time
-#import spidev
+import spidev
 import os
 import wx
 import Queue
 import wx.grid as gridlib
 from threading import Thread
-#from lib_nrf24 import NRF24
+from lib_nrf24 import NRF24
 from wx.lib.pubsub import pub
 import wx.lib.agw.fourwaysplitter as fws
-"""
+
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-"""
 
 MENU = ["Cappucino","Latte", "Flatwhite", "Americano", "Machiatto"]
 
@@ -35,7 +34,6 @@ class RadioThread(Thread):
 		#addresses for communication with transmitter
 		self.messageQueue = Queue.Queue()
 
-		"""
 		self.pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
 		self.radio = NRF24(GPIO, spidev.SpiDev())
 		self.receivedMessage = []
@@ -55,20 +53,14 @@ class RadioThread(Thread):
 		self.radio.enableAckPayload()
 
 		self.radio.openReadingPipe(1,self.pipes[1])
-		self.radio.printDetails()
+		#self.radio.printDetails()
 
 		#start listening to incoming messages
 		self.radio.startListening()
-		"""
 		self.start()
 	
 	def run(self):
 		while True:
-			print("Radio Radio Radio")
-			time.sleep(1)
-			self.messageQueue.put("11111")
-
-			"""
 			while not self.radio.available(0):
 					time.sleep(1/100)
 
@@ -89,8 +81,6 @@ class RadioThread(Thread):
 
 			print("Message decodes to : {}".format(self.stringMessage))
 			self.messageQueue.put(self.stringMessage)
-			"""
-
 
 			wx.CallAfter(pub.sendMessage,"update panel",message = self.messageQueue.get())
 
@@ -175,11 +165,6 @@ class MyFrame(wx.Frame):
 		if self.currentPanel > 3:
 			self.currentPanel = 0
 		
-	
-
-
-
-
 main()
 
 
