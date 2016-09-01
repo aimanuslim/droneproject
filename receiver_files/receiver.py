@@ -1,21 +1,31 @@
 #!/usr/bin/env python
 
-import RPi.GPIO as GPIO
+#import RPi.GPIO as GPIO
 import time
-import spidev
+#import spidev
 import os
 import wx
 import Queue
 import wx.grid as gridlib
 from threading import Thread
-from lib_nrf24 import NRF24
-#from wx.lib.pubsub import Publisher
-
+#from lib_nrf24 import NRF24
+from wx.lib.pubsub import Publisher
+import wx.lib.agw.fourwaysplitter as fws
+"""
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
+"""
+
+MENU = ["Cappucino","Latte", "Flatwhite", "Americano", "Machiatto"]
 
 def main():
-	app = PhotoCtrl()
+	app = wx.App(False)
+ 
+	frame = MyFrame()
+	app.SetTopWindow(frame)
+	frame.Show()
+	#frame.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
+	frame.Maximize(True)
 	app.MainLoop()
 
 class RadioThread(Thread):
@@ -25,7 +35,7 @@ class RadioThread(Thread):
 		#addresses for communication with transmitter
 		self.messageQueue = Queue.Queue()
 
-		
+		"""
 		self.pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
 		self.radio = NRF24(GPIO, spidev.SpiDev())
 		self.receivedMessage = []
@@ -49,15 +59,18 @@ class RadioThread(Thread):
 
 		#start listening to incoming messages
 		self.radio.startListening()
-	
+		"""
 		self.start()
 	
 	def run(self):
 		while True:
+			print("Radio Radio Radio")
 			time.sleep(1)
-			
+			self.messageQueue.put("11111")
+
+			"""
 			while not self.radio.available(0):
-        			time.sleep(1/100)
+					time.sleep(1/100)
 
 
 			self.receivedMessage = []
@@ -72,66 +85,100 @@ class RadioThread(Thread):
 
 			for n in self.receivedMessage:
 				if (n >= 32 and n<= 126):
-        				self.stringMessage += chr(n)
+						self.stringMessage += chr(n)
 
 			print("Message decodes to : {}".format(self.stringMessage))
 			self.messageQueue.put(self.stringMessage)
-			
+			"""
 
-class PhotoCtrl(wx.App):
-    def __init__(self, redirect=False, filename=None):
-    	wx.App.__init__(self, redirect, filename)
-    	RadioThread()
-    	self.screenWidth, self.screenHeight = wx.GetDisplaySize()
-    	self.frame = wx.Frame(None, title="Order Screen",size=(self.screenWidth,self.screenHeight))
-        self.panel = wx.Panel(self.frame)
-        self.grid = gridlib.Grid(self.panel)
-        self.grid.CreateGrid(3,2)
-        #self.frame.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
-        self.frame.Show()
 
-        #self.createWidgets()
-        
- 
-    def createWidgets(self):
-        instructions = 'Browse for an image'
+			Publisher().sendMessage("update panel",self.messageQueue.get())
 
-        img = wx.EmptyImage(self.screenWidth/2,self.screenHeight/2)
-        self.imageCtrl = wx.StaticBitmap(self.panel, wx.ID_ANY, 
-                                         wx.BitmapFromImage(img))
+
+class OrderPanel(wx.Panel):
+	def __init__(self,splitter,count):
+		wx.Panel.__init__(self,splitter)
+		self.color = wx.BLUE
+		self.fontSize = 20
+		self.distanceFromTop = 10;
+		self.distanceFromSide = 10;
+		self.distanceFromPanelInfo = 50
+		self.panelInfoFont = wx.Font(self.fontSize,wx.SWISS,wx.NORMAL,wx.BOLD,underline=True)
+
+		self.panelInfo = wx.StaticText(self,-1, "ORDER PANEL " + str(count),pos=(self.distanceFromSide,self.distanceFromTop))
+		self.panelInfo.SetForegroundColour(wx.WHITE)
+		self.panelInfo.SetFont(self.panelInfoFont)
+
+		self.orderNumberInfo = wx.StaticText(self,-1, "#",pos = (800,self.distanceFromTop))
+		self.orderNumberInfo.SetForegroundColour(wx.WHITE)
+		self.orderNumberInfo.SetFont(self.panelInfoFont)
+		
+		newDistance = self.distanceFromTop + self.distanceFromPanelInfo + self.fontSize
+		self.orderInfo = wx.StaticText(self,-1, "", pos=(self.distanceFromSide,newDistance))
+		self.orderInfo.SetFont(self.panelInfoFont)
+		self.orderInfo.SetForegroundColour(wx.WHITE)
+
+		self.SetBackgroundColour(self.color)
+
+
+class MyFrame(wx.Frame):
  
-        instructLbl = wx.StaticText(self.panel, label=instructions)
-        self.photoTxt = wx.TextCtrl(self.panel, size=(200,-1))
-        browseBtn = wx.Button(self.panel, label='Browse')
-        browseBtn.Bind(wx.EVT_BUTTON, self.onBrowse)
- 
-        self.mainSizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
- 
-        self.mainSizer.Add(wx.StaticLine(self.panel, wx.ID_ANY),
-                           0, wx.ALL|wx.EXPAND, 5)
-        self.mainSizer.Add(instructLbl, 0, wx.ALL, 5)
-        self.mainSizer.Add(self.imageCtrl, 0, wx.ALL, 5)
-        self.sizer.Add(self.photoTxt, 0, wx.ALL, 5)
-        self.sizer.Add(browseBtn, 0, wx.ALL, 5)        
-        self.mainSizer.Add(self.sizer, 0, wx.ALL, 5)
- 
-        self.panel.SetSizer(self.mainSizer)
-        self.mainSizer.Fit(self.frame)
- 
-        self.panel.Layout()
- 
-    def onBrowse(self, event):
-        """ 
-        Browse for file
-        """
-        wildcard = "JPEG files (*.jpg)|*.jpg"
-        dialog = wx.FileDialog(None, "Choose a file",
-                               wildcard=wildcard,
-                               style=wx.OPEN)
-        if dialog.ShowModal() == wx.ID_OK:
-            self.photoTxt.SetValue(dialog.GetPath())
-        dialog.Destroy() 
-        self.onView()
- 
+	#----------------------------------------------------------------------
+	def __init__(self):
+		wx.Frame.__init__(self, None, title="Order Screen")
+		splitter = fws.FourWaySplitter(self, agwStyle=wx.SP_LIVE_UPDATE)
+		self.maxNumberOfPanels = 4
+		self.orderPanels = []
+		self.currentPanel = 0
+		self.currentOrder = 1
+		self.color = wx.BLUE
+
+		print("Subscribing.....")
+		Publisher().subscribe(self.onOrderReceived,('update panel'))
+		print("Subscribed to updatePanels")
+
+		print("Starting RadioThread")
+		RadioThread()
+		print("RadioThread started")
+		#create individual Panels
+		for i in range (1,self.maxNumberOfPanels + 1):
+			panel = OrderPanel(splitter,i)
+			splitter.AppendWindow(panel)
+			self.orderPanels.append(panel)
+
+	def getListOfOrder(self,order):
+		global MENU
+		currentIndex = 0
+		orderList = ""
+		print("Order is: {}".format(order))
+		for c in order:
+			if int(c) == 1:
+				orderList = orderList + "[+] " + MENU[currentIndex] +"\n"
+
+			currentIndex = currentIndex + 1
+
+		return orderList.rstrip()
+
+	def onOrderReceived(self,msg):
+		# Parse the order string
+		print("onOrderReceived/ Order is : {}".format(msg))
+		orderList = self.getListOfOrder(msg)
+
+		#update currentPanel
+		self.orderPanels[self.currentPanel].orderInfo.SetLabel(orderList)
+		self.orderPanels[self.currentPanel].orderNumberInfo.SetLabel("# " + str(self.currentOrder))
+
+		self.currentOrder = self.currentOrder + 1
+		self.currentPanel = self.currentPanel + 1
+
+		if self.currentPanel > 3:
+			self.currentPanel = 0
+		
+	
+
+
+
+
 main()
+
+
