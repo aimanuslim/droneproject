@@ -9,8 +9,6 @@ import serial
 from threading import Thread
 from wx.lib.pubsub import Publisher
 
-itemSelected = []
-
 def main():
 	app = wx.PySimpleApp()
 	app.TopWindow = ViewerFrame()

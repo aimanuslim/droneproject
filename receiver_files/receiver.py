@@ -1,15 +1,31 @@
-import RPi.GPIO as GPIO
-from lib_nrf24 import NRF24
+#!/usr/bin/env python
+
+#import RPi.GPIO as GPIO
 import time
-import spidev
+#import spidev
 import os
+import wx
+import Queue
+import wx.grid as gridlib
+from threading import Thread
+#from lib_nrf24 import NRF24
+from wx.lib.pubsub import Publisher
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
+#GPIO.setmode(GPIO.BCM)
+#GPIO.setwarnings(False)
 
-class RadioClass():
+def main():
+	app = PhotoCtrl()
+	app.MainLoop()
+
+class RadioThread(Thread):
 	def __init__(self):
+
+		Thread.__init__(self)
 		#addresses for communication with transmitter
+		self.messageQueue = Queue.Queue()
+
+		
 		self.pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
 		self.radio = NRF24(GPIO, spidev.SpiDev())
 		self.receivedMessage = []
@@ -33,9 +49,14 @@ class RadioClass():
 
 		#start listening to incoming messages
 		self.radio.startListening()
-
-	def getOrders(self):
+	
+		self.start()
+	
+	def run(self):
 		while True:
+			print("Radio Radio Radio")
+			time.sleep(1)
+			
 			while not self.radio.available(0):
         			time.sleep(1/100)
 
@@ -55,6 +76,65 @@ class RadioClass():
         				self.stringMessage += chr(n)
 
 			print("Message decodes to : {}".format(self.stringMessage))
+			self.stringMessage = self.stringMessage[:-1]
+			print("Message -1 : {}".format(self.stringMessage))
+			self.messageQueue.put(self.stringMessage)
+			
 
-piRadio = RadioClass()
-piRadio.getOrders()
+class PhotoCtrl(wx.App):
+    def __init__(self, redirect=False, filename=None):
+    	wx.App.__init__(self, redirect, filename)
+    	RadioThread()
+    	self.screenWidth, self.screenHeight = wx.GetDisplaySize()
+    	self.frame = wx.Frame(None, title="Order Screen",size=(self.screenWidth,self.screenHeight))
+        self.panel = wx.Panel(self.frame)
+        self.grid = gridlib.Grid(self.panel)
+        self.grid.CreateGrid(3,2)
+        #self.frame.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
+        self.frame.Show()
+
+        #self.createWidgets()
+        
+ 
+    def createWidgets(self):
+        instructions = 'Browse for an image'
+
+        img = wx.EmptyImage(self.screenWidth/2,self.screenHeight/2)
+        self.imageCtrl = wx.StaticBitmap(self.panel, wx.ID_ANY, 
+                                         wx.BitmapFromImage(img))
+ 
+        instructLbl = wx.StaticText(self.panel, label=instructions)
+        self.photoTxt = wx.TextCtrl(self.panel, size=(200,-1))
+        browseBtn = wx.Button(self.panel, label='Browse')
+        browseBtn.Bind(wx.EVT_BUTTON, self.onBrowse)
+ 
+        self.mainSizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
+ 
+        self.mainSizer.Add(wx.StaticLine(self.panel, wx.ID_ANY),
+                           0, wx.ALL|wx.EXPAND, 5)
+        self.mainSizer.Add(instructLbl, 0, wx.ALL, 5)
+        self.mainSizer.Add(self.imageCtrl, 0, wx.ALL, 5)
+        self.sizer.Add(self.photoTxt, 0, wx.ALL, 5)
+        self.sizer.Add(browseBtn, 0, wx.ALL, 5)        
+        self.mainSizer.Add(self.sizer, 0, wx.ALL, 5)
+ 
+        self.panel.SetSizer(self.mainSizer)
+        self.mainSizer.Fit(self.frame)
+ 
+        self.panel.Layout()
+ 
+    def onBrowse(self, event):
+        """ 
+        Browse for file
+        """
+        wildcard = "JPEG files (*.jpg)|*.jpg"
+        dialog = wx.FileDialog(None, "Choose a file",
+                               wildcard=wildcard,
+                               style=wx.OPEN)
+        if dialog.ShowModal() == wx.ID_OK:
+            self.photoTxt.SetValue(dialog.GetPath())
+        dialog.Destroy() 
+        self.onView()
+ 
+main()
