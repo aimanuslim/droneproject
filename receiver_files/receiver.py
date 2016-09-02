@@ -15,7 +15,7 @@ import wx.lib.agw.fourwaysplitter as fws
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 
-MENU = ["Cappucino","Latte", "Flatwhite", "Americano", "Machiatto"]
+MENU = ["Espresso", "Caffe Latte", "Cappuccino", "Americano", "Caffe Mocha", "Cafe au Lait"]
 
 def main():
 	app = wx.App(False)
@@ -68,10 +68,6 @@ class RadioThread(Thread):
 			self.receivedMessage = []
 			self.radio.read(self.receivedMessage, self.radio.getDynamicPayloadSize())
 
-			print("Received: {}".format(self.receivedMessage))
-
-			print("translating our received Message into unicode characters...")
-
 			#Decode into standard unicode set
 			self.stringMessage = ""
 
@@ -88,7 +84,7 @@ class RadioThread(Thread):
 class OrderPanel(wx.Panel):
 	def __init__(self,splitter,count):
 		wx.Panel.__init__(self,splitter)
-		self.color = wx.BLUE
+		self.color = "#46C6F3"
 		self.fontSize = 20
 		self.distanceFromTop = 10;
 		self.distanceFromSide = 10;
@@ -122,7 +118,8 @@ class MyFrame(wx.Frame):
 		self.orderPanels = []
 		self.currentPanel = 0
 		self.currentOrder = 1
-		self.color = wx.BLUE
+		self.color = "#46C6F3"
+		self.selectedColor = "#09C595"
 
 		print("Subscribing.....")
 		pub.subscribe(self.onOrderReceived,"update panel")
@@ -156,10 +153,10 @@ class MyFrame(wx.Frame):
 
 		#update currentPanel
 		for panel in self.orderPanels:
-			panel.SetBackgroundColour(wx.BLUE)
+			panel.SetBackgroundColour(self.color)
 
 		self.orderPanels[self.currentPanel].orderInfo.SetLabel(orderList)
-		self.orderPanels[self.currentPanel].SetBackgroundColour(wx.RED)
+		self.orderPanels[self.currentPanel].SetBackgroundColour(self.selectedColor)
 		self.orderPanels[self.currentPanel].orderNumberInfo.SetLabel("# " + str(self.currentOrder))
 
 		self.currentOrder = self.currentOrder + 1

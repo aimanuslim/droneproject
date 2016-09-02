@@ -7,7 +7,12 @@ import sys
 import time
 import serial
 from threading import Thread
-from wx.lib.pubsub import Publisher
+from wx.lib.pubsub import setuparg1
+from wx.lib.pubsub import pub as Publisher
+import wx.lib.agw.pybusyinfo as PBI
+
+#from wx.lib.pubsub import Publisher
+MENU = ["Espresso", "Caffe Latte", "Cappuccino", "Americano", "Caffe Mocha", "Cafe au Lait"]
 
 def main():
 	app = wx.PySimpleApp()
@@ -41,19 +46,23 @@ class GestureThread(Thread):
 		"""
 
 		for i in range(1,1000):
-			time.sleep(1)
+			time.sleep(0.2)
 			print("Gesture Thread # {}. Modulo by 5 is {}".format(i, i % 5))
 
 			if (i%5) == 0:
 				print("Entered next picture")
-				wx.CallAfter(Publisher().sendMessage,"next picture","")
+				wx.CallAfter(Publisher.sendMessage,"next picture","")
+				#wx.CallAfter(Publisher().sendMessage,"next picture","")
 
 			if (i%12) == 0:
 				print("Selected this picture")
-				wx.CallAfter(Publisher().sendMessage,"select picture","")
+				wx.CallAfter(Publisher.sendMessage,"select picture","")
+			  	#wx.CallAfter(Publisher().sendMessage,"select picture","")
 
 			if (i%17) == 0:
-				wx.CallAfter(Publisher().sendMessage,"send order","")
+				wx.CallAfter(Publisher.sendMessage,"send order","")
+				time.sleep(5)
+				#wx.CallAfter(Publisher().sendMessage,"send order","")
 
 #############################################################################
 
@@ -101,205 +110,244 @@ class RadioThread(Thread):
 
 class ViewerPanel(wx.Panel):
 
-    def __init__(self, parent):
-    	time.sleep(3)
-        wx.Panel.__init__(self, parent)
-        
-        width, height = wx.DisplaySize()
-        self.picPaths = []
-        self.currentPicture = 0
-        self.selectedPictures = []
-        self.totalPictures = 0
-        self.photoMaxSize = height - 200
-        self.arduino = RadioThread()
-
-        Publisher().subscribe(self.updateImages, ("update images"))
-        print("Subscribed to updateImages")
-        Publisher().subscribe(self.nextPicture,("next picture"))
-        print("Subscribed to nextPicture")
-        Publisher().subscribe(self.previousPicture,("previous picture"))
-        print("Subscribed to prevPicture")
-        Publisher().subscribe(self.selectPicture,("select picture"))
-        print("Subscribed to selectPicture")
-        Publisher().subscribe(self.unselectPicture,("unselect picture"))
-        print("Subscribed to unselectPicture")
-        Publisher().subscribe(self.sendOrder,("send order"))
-        print("Subscribed to sendOrder")
-        self.layout()
-        
-    #----------------------------------------------------------------------
+	def __init__(self, parent):
+		time.sleep(3)
+		wx.Panel.__init__(self, parent)
+		
+		width, height = wx.DisplaySize()
+		print("Screen is {} x {}".format(width,height))
+		self.softBlue = "#46C6F3"
+		self.green = "#09C595"
+		self.picPaths = []
+		self.checkBoxPath = os.getcwd() + "/img_src/" + "check_box.jpg"
+		self.currentPicture = 0
+		self.selectedPictures = []
+		self.totalPictures = 0
+		self.photoMaxSize = width/2
+		print("photomax size is {}".format(self.photoMaxSize))
+		self.arduino = RadioThread()
 
 
+		Publisher.subscribe(self.updateImages, ("update images"))
+		print("Subscribed to updateImages")
+		Publisher.subscribe(self.nextPicture,("next picture"))
+		print("Subscribed to nextPicture")
+		Publisher.subscribe(self.previousPicture,("previous picture"))
+		print("Subscribed to prevPicture")
+		Publisher.subscribe(self.selectPicture,("select picture"))
+		print("Subscribed to selectPicture")
+		Publisher.subscribe(self.unselectPicture,("unselect picture"))
+		print("Subscribed to unselectPicture")
+		Publisher.subscribe(self.sendOrder,("send order"))
+		print("Subscribed to sendOrder")
 
-    def layout(self):
-        
-        self.mainSizer = wx.BoxSizer(wx.VERTICAL)
-        btnSizer = wx.BoxSizer(wx.HORIZONTAL)
-        
-        img = wx.EmptyImage(self.photoMaxSize,self.photoMaxSize)
-        self.imageCtrl = wx.StaticBitmap(self, wx.ID_ANY, 
-                                         wx.BitmapFromImage(img))
-        self.mainSizer.Add(self.imageCtrl, 0, wx.ALL|wx.CENTER, 5)
-        self.imageLabel = wx.StaticText(self, label="")
-        self.mainSizer.Add(self.imageLabel, 0, wx.ALL|wx.CENTER, 5)
-        
-            
-        self.mainSizer.Add(btnSizer, 0, wx.CENTER)
-        self.SetSizer(self.mainSizer)
-        
-    #----------------------------------------------------------------------
-    def loadImage(self, image):
-        """"""
-        image_name = os.path.basename(image)
-        img = wx.Image(image, wx.BITMAP_TYPE_ANY)
-        # scale the image, preserving the aspect ratio
-        W = img.GetWidth()
-        H = img.GetHeight()
-        if W > H:
-            NewW = self.photoMaxSize
-            NewH = self.photoMaxSize * H / W
-        else:
-            NewH = self.photoMaxSize
-            NewW = self.photoMaxSize * W / H
-        img = img.Scale(NewW,NewH)
+		"""
+		Publisher().subscribe(self.updateImages, ("update images"))
+		print("Subscribed to updateImages")
+		Publisher().subscribe(self.nextPicture,("next picture"))
+		print("Subscribed to nextPicture")
+		Publisher().subscribe(self.previousPicture,("previous picture"))
+		print("Subscribed to prevPicture")
+		Publisher().subscribe(self.selectPicture,("select picture"))
+		print("Subscribed to selectPicture")
+		Publisher().subscribe(self.unselectPicture,("unselect picture"))
+		print("Subscribed to unselectPicture")
+		Publisher().subscribe(self.sendOrder,("send order"))
+		print("Subscribed to sendOrder")
+		"""
 
-        self.imageCtrl.SetBitmap(wx.BitmapFromImage(img))
-
-        if self.selectedPictures[self.currentPicture] is True:
-        	label = "Selected"
-
-        else:
-        	label = "Not selected"
-
-        self.imageLabel.SetLabel(label)
-        self.Refresh()
-        Publisher().sendMessage("resize", "")
-
-    def loadOrderSent(self):
-    	print("Entered order sent!")
-    	self.loadImage("/home/realsense/droneproject/transmitter_files/check_box.png")
-    	self.imageLabel.SetLabel("Order sent!")
-    	time.sleep(3)
-
-        self.loadImage(self.picPaths[0])
-
-        
-    #----------------------------------------------------------------------
-    def nextPicture(self,msg):
-        """
-        Loads the next picture in the directory
-        """
-        if self.currentPicture == self.totalPictures-1:
-            self.currentPicture = 0
-        else:
-            self.currentPicture += 1
-        self.loadImage(self.picPaths[self.currentPicture])
-        print("currentPicture is :")
-        print self.currentPicture
-        
-    #----------------------------------------------------------------------
-    def previousPicture(self,msg):
-        """
-        Displays the previous picture in the directory
-        """
-        if self.currentPicture == 0:
-            self.currentPicture = self.totalPictures - 1
-        else:
-            self.currentPicture -= 1
-        self.loadImage(self.picPaths[self.currentPicture])
-        print("currentPicture is :")
-        print self.currentPicture
-        
-        
-    #----------------------------------------------------------------------
-    def updateImages(self, msg):
-        """
-        Updates the picPaths list to contain the current folder's images
-        """
-        self.picPaths = msg.data
-        self.totalPictures = len(self.picPaths)
-
-        for i in range(0,self.totalPictures):
-        	self.selectedPictures.append(False)
-
-        self.loadImage(self.picPaths[0])
-        
-    #----------------------------------------------------------------------
-    def selectPicture(self, msg):
-    	"""
-    	Select current picture and mark the corresponding list to True
-    	Change the label to selected
-    	"""
-    	self.selectedPictures[self.currentPicture] = True
-    	self.imageLabel.SetLabel("Selected")
-        self.Refresh()
+		self.layout()
+		
+	#----------------------------------------------------------------------
 
 
-    def unselectPicture(self, msg):
-    	"""
-    	Unselect current picture and mark the corresponding list to False
-    	Set the label to unselected
-    	"""
-    	self.selectedPictures[self.currentPicture] = False
-    	self.imageLabel.SetLabel("Not selected")
-        self.Refresh()
 
-    def sendOrder(self, msg):
+	def layout(self):
+		
+		self.mainSizer = wx.BoxSizer(wx.VERTICAL)
+		btnSizer = wx.BoxSizer(wx.HORIZONTAL)
+		
+		img = wx.EmptyImage(self.photoMaxSize,self.photoMaxSize)
+		self.imageCtrl = wx.StaticBitmap(self, wx.ID_ANY, 
+										 wx.BitmapFromImage(img))
+		self.mainSizer.Add(self.imageCtrl, 0, wx.ALL|wx.CENTER, 5)
+		self.imageLabel = wx.StaticText(self, label="")
+		self.imageLabelFont = wx.Font(30,wx.SCRIPT,wx.NORMAL,wx.NORMAL)
+		self.imageLabel.SetFont(self.imageLabelFont)
+		self.imageLabel.SetForegroundColour(wx.WHITE)
 
-    	"""
-    	Convert the selectedPictures list into string and send this string to the RadioThread Object
-    	Set all the elements in selectedPictures to false
+		self.mainSizer.Add(self.imageLabel, 0, wx.ALL|wx.CENTER, 5)
+		
+			
+		self.mainSizer.Add(btnSizer, 0, wx.CENTER)
+		self.SetSizer(self.mainSizer)
+		
+	#----------------------------------------------------------------------
+	def loadImage(self, image):
+		""""""
+		global MENU
 
-    	"""
-    	order = str(len(self.selectedPictures))
+		#img = wx.Image(self.checkBoxPath, wx.BITMAP_TYPE_ANY)
+		img = wx.Image(image, wx.BITMAP_TYPE_ANY)
+		# scale the image, preserving the aspect ratio
+		W = img.GetWidth()
+		H = img.GetHeight()
+		if W > H:
+			NewW = self.photoMaxSize
+			NewH = self.photoMaxSize * H / W
+		else:
+			NewH = self.photoMaxSize
+			NewW = self.photoMaxSize * W / H
+		img = img.Scale(NewW,NewH)
 
-    	for selection in self.selectedPictures:
-    		if selection is True:
-    			order = order + str(1)
+		self.imageCtrl.SetBitmap(wx.BitmapFromImage(img))
 
-    		else:
-    			order = order + str(0)
+		if self.selectedPictures[self.currentPicture] is True:
+			self.SetBackgroundColour(self.green)
 
-    	print("The array is {} and string is {}".format(self.selectedPictures,order))
+		else:
+			self.SetBackgroundColour(self.softBlue)
 
-    	self.selectedPictures = [False for n in self.selectedPictures]
-    	print(self.selectedPictures)
-    	self.loadOrderSent()
-    	self.arduino.writeToArduino(order)
+		self.imageLabel.SetLabel(MENU[self.currentPicture])
+		self.Refresh()
+		Publisher.sendMessage("resize", "")
+		#Publisher().sendMessage("resize", "")
+
+	def loadOrderSent(self,order):
+		print("Entered order sent!")
+
+		self.arduino.writeToArduino(order)
+
+		dlgTitle = "Processing order"
+		dlgMessage = "Please be patient while we process your order"
+		maxProg = 12
+		dlg = wx.ProgressDialog(dlgTitle, dlgMessage, maximum=maxProg)
+
+		for i in range(0,12):
+			wx.MilliSleep(250)
+			dlg.Update(i)
+
+		dlg.Destroy()
+
+		self.currentPicture = 0
+		self.loadImage(self.picPaths[self.currentPicture])
+		print("RESET")
+		
+	#----------------------------------------------------------------------
+	def nextPicture(self,msg):
+		"""
+		Loads the next picture in the directory
+		"""
+		if self.currentPicture == self.totalPictures-1:
+			self.currentPicture = 0
+		else:
+			self.currentPicture += 1
+		self.loadImage(self.picPaths[self.currentPicture])
+		
+	#----------------------------------------------------------------------
+	def previousPicture(self,msg):
+		"""
+		Displays the previous picture in the directory
+		"""
+		if self.currentPicture == 0:
+			self.currentPicture = self.totalPictures - 1
+		else:
+			self.currentPicture -= 1
+		self.loadImage(self.picPaths[self.currentPicture])
+		
+		
+	#----------------------------------------------------------------------
+	def updateImages(self, msg):
+		"""
+		Updates the picPaths list to contain the current folder's images
+		"""
+		self.picPaths = msg.data
+		self.totalPictures = len(self.picPaths)
+
+		for i in range(0,self.totalPictures):
+			self.selectedPictures.append(False)
+
+		self.loadImage(self.picPaths[0])
+		
+	#----------------------------------------------------------------------
+	def selectPicture(self, msg):
+		"""
+		Select current picture and mark the corresponding list to True
+		Change the label to selected
+		"""
+		self.selectedPictures[self.currentPicture] = True
+		self.SetBackgroundColour(self.green)
+		self.Refresh()
+
+
+	def unselectPicture(self, msg):
+		"""
+		Unselect current picture and mark the corresponding list to False
+		Set the label to unselected
+		"""
+		self.selectedPictures[self.currentPicture] = False
+		self.SetBackgroundColour(self.softBlue)
+		self.Refresh()
+
+	def sendOrder(self, msg):
+
+		"""
+		Convert the selectedPictures list into string and send this string to the RadioThread Object
+		Set all the elements in selectedPictures to false
+
+		"""
+		order = str(len(self.selectedPictures))
+
+		for selection in self.selectedPictures:
+			if selection is True:
+				order = order + str(1)
+
+			else:
+				order = order + str(0)
+
+		print("The array is {} and string is {}".format(self.selectedPictures,order))
+
+		self.selectedPictures = [False for n in self.selectedPictures]
+		print(self.selectedPictures)
+		self.loadOrderSent(order)
+
 
 
 ########################################################################
 class ViewerFrame(wx.Frame):
 
-    #----------------------------------------------------------------------
-    def __init__(self):
-        wx.Frame.__init__(self, None, title="Image Viewer")
-        panel = ViewerPanel(self)
-        self.folderPath = ""
-        Publisher().subscribe(self.resizeFrame, ("resize"))
-       	
-        self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(panel, 1, wx.EXPAND)
-        self.SetSizer(self.sizer)
-        self.openDirectory()
-        
-        self.Show()
-        self.Maximize(True)
-        self.sizer.Fit(self)
-        GestureThread()
-        self.Center()
-        
+	#----------------------------------------------------------------------
+	def __init__(self):
+		wx.Frame.__init__(self, None, title="Image Viewer")
+		panel = ViewerPanel(self)
+		self.folderPath = ""
+		Publisher.subscribe(self.resizeFrame, ("resize"))
+		#Publisher().subscribe(self.resizeFrame, ("resize"))
+		
+		self.sizer = wx.BoxSizer(wx.VERTICAL)
+		self.sizer.Add(panel, 1, wx.EXPAND)
+		self.SetSizer(self.sizer)
+		self.openDirectory()
+		
+		self.Show()
+		#self.Maximize(True)
+		self.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
+		self.sizer.Fit(self)
+		GestureThread()
+		self.Center()
+		
 
-    def openDirectory(self):
-    	self.folderPath = os.getcwd()
-    	print(self.folderPath)
-    	picPaths = sorted(glob.glob(self.folderPath + "/img_src/" + "/*.jpg"))
-    	print picPaths
-        print(len(picPaths))
-        Publisher().sendMessage("update images", picPaths)
-        
-    #----------------------------------------------------------------------
-    def resizeFrame(self, msg):
-        self.sizer.Fit(self)
+	def openDirectory(self):
+		self.folderPath = os.getcwd()
+		print(self.folderPath)
+		picPaths = sorted(glob.glob(self.folderPath + "/img_src/" + "/0*.jpg"))
+		print picPaths
+		print(len(picPaths))
+		Publisher.sendMessage("update images", picPaths)
+		#Publisher().sendMessage("update images", picPaths)
+		
+	#----------------------------------------------------------------------
+	def resizeFrame(self, msg):
+		self.sizer.Fit(self)
 
 main()
