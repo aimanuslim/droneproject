@@ -46,7 +46,7 @@ class GestureThread(Thread):
 		"""
 
 		for i in range(1,1000):
-			time.sleep(0.5)
+			time.sleep(0.2)
 			print("Gesture Thread # {}. Modulo by 5 is {}".format(i, i % 5))
 
 			if (i%5) == 0:
@@ -115,8 +115,6 @@ class ViewerPanel(wx.Panel):
 		wx.Panel.__init__(self, parent)
 		
 		width, height = wx.DisplaySize()
-		width = 858
-		height = 480
 		print("Screen is {} x {}".format(width,height))
 		self.softBlue = "#46C6F3"
 		self.green = "#09C595"
@@ -127,7 +125,7 @@ class ViewerPanel(wx.Panel):
 		self.totalPictures = 0
 		self.photoMaxSize = width/2
 		print("photomax size is {}".format(self.photoMaxSize))
-		#self.arduino = RadioThread()
+		self.arduino = RadioThread()
 
 
 		Publisher.subscribe(self.updateImages, ("update images"))
@@ -215,16 +213,21 @@ class ViewerPanel(wx.Panel):
 		Publisher.sendMessage("resize", "")
 		#Publisher().sendMessage("resize", "")
 
-	def loadOrderSent(self):
+	def loadOrderSent(self,order):
 		print("Entered order sent!")
-		#self.arduino.writeToArduino(order)
-		message = "Processing your order. Please wait 3 seconds....."
-		orderSentDialog = PBI.PyBusyInfo(message,parent=None,title="Order Sent!")
-		
-		for i in xrange(3):
-			wx.MilliSleep(1000)
 
-		del orderSentDialog
+		self.arduino.writeToArduino(order)
+
+		dlgTitle = "Processing order"
+		dlgMessage = "Please be patient while we process your order"
+		maxProg = 12
+		dlg = wx.ProgressDialog(dlgTitle, dlgMessage, maximum=maxProg)
+
+		for i in range(0,12):
+			wx.MilliSleep(250)
+			dlg.Update(i)
+
+		dlg.Destroy()
 
 		self.currentPicture = 0
 		self.loadImage(self.picPaths[self.currentPicture])
@@ -306,7 +309,8 @@ class ViewerPanel(wx.Panel):
 
 		self.selectedPictures = [False for n in self.selectedPictures]
 		print(self.selectedPictures)
-		self.loadOrderSent()
+		self.loadOrderSent(order)
+
 
 
 ########################################################################
@@ -327,7 +331,7 @@ class ViewerFrame(wx.Frame):
 		
 		self.Show()
 		#self.Maximize(True)
-		#self.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
+		self.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
 		self.sizer.Fit(self)
 		GestureThread()
 		self.Center()
