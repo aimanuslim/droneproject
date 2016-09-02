@@ -1,30 +1,50 @@
 #! usr/bin/python
 
+import cv2
+import numpy as np
+import sys
+import math
+
 # Code based on tutorial on this website: http://creat-tabu.blogspot.my/2013/08/opencv-python-hand-gesture-recognition.html
 # Using angle idea based on: http://simena86.github.io/blog/2013/08/12/hand-tracking-and-recognition-with-opencv/
 
 # IMG_TO_BE_TESTED = "ok_sign.jpg"
 # IMG_TO_BE_TESTED = "imagex01.jpg"
 
+#TODO:
+# 1. Save state when there is no movement.
+# 2. Use hand gesture recognition from the new guy
+
 
 IMG_TO_BE_TESTED = "Hand-Gestures.jpg"
-WIDTH = int(1920 * 0.4)
-HEIGHT = int(1080 * 0.4)
+WIDTH = int(1280 * 0.9)
+HEIGHT = int(720 * 0.9)
 maxAngle = 80
 frameToInspect = 250
 # parameters for MOG2 module
 backgroundRatio = 0.4
-history = 500
-complexityReductionThreshold = 0.02
+history = 200
+complexityReductionThreshold = 0.05
+
+# threshold params
+thresh_lower = 150
+gaussian_ksize = 11
+
 bufferLength = 80
 typicalDistance = 1000000
 intervals = 5
-scale = 1000
+scale = 1
+waitTime = 2
+minSpeed = 400
+noMovementCounter = 0
+steadyState = False
+timeLimit = 3
 
-import cv2
-import numpy as np
-import sys
-import math
+lower = np.array([0, 30, 60], dtype = "uint8")
+upper = np.array([20, 150, 255], dtype = "uint8")
+
+
+
 
 
 print("OpenCV version: ", cv2.__version__)
@@ -72,28 +92,110 @@ def findAngle(p0, p1, p2):
     v2 = normalize(v2)
     return math.acos(v1.dot(v2)) * (180 / math.pi)
 
+def find3rdPoint(pt, center, i):
+    if(pt[0] >= 0 and pt[0] < WIDTH and pt[1] >= 0 and pt[1] < HEIGHT):
+        d = distance(pt, center)
+        dcos = d * math.cos(math.pi / 4) 
+        dsin = d * math.sin(math.pi / 4)
+        if(i == 3 or i == 0): px = pt[0] - dsin
+        else: px = pt[0] + dsin  
+        if(i == 0 or i == 1): py = center[1] + dcos
+        else: py = center[1] - dcos
+        return (int(px), int(py))
+    else: return None    
 
 
-def  gestureRecognize(ori, mask):
-    # rgbMask = cv2.imread(inputImgName)
-    rgbMask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-    kernel = np.ones((5,5),np.uint8)
-    openedMask = cv2.morphologyEx(rgbMask, cv2.MORPH_OPEN, kernel)
-    grayMask = cv2.cvtColor(openedMask, cv2.COLOR_BGR2GRAY)
+def findDividingLine(box, center):
+    p0, p1, p2, p3 = box[0], box[1], box[2], box[3]
+    # print("Box points {} {} {} {}".format(p0, p1, p2, p3))
+
+    r0 = find3rdPoint(p0, center, 0)
+    r1 = find3rdPoint(p1, center, 1)
+    r2 = find3rdPoint(p2, center, 2)
+    r3 = find3rdPoint(p3, center, 3)
+
+    arrR = [r0, r1, r2, r3]
+    indices = [i for i, e in enumerate(arrR) if e is not None]
+    arrR = [e for e in arrR if e is not None]
+    print arrR
+    return arrR, indices
+    
 
 
+    xdelta = float(p3[0] - p2[0])
+    ydelta = float(p3[1] - p2[1])
+    if(xdelta == 0 and ydelta != 0):
+        x23_center = p3[0]
+        y23_center = center[1]
+    elif(ydelta == 0 and xdelta != 0):
+        x23_center = center[0]
+        y23_center = p3[1]
+    else:
+        m23 = ydelta / xdelta
+        m_center = - 1 / m23
+        c_center = center[1] - center[0] * m_center
+        c23 =  p3[1] - p3[0] * m23
+        x23_center = (c23 - c_center) / (m23 - m_center)
+        y23_center = m23 * x23_center + c23
+
+    xdelta = float(p0[0] - p1[0])
+    ydelta = float(p0[1] - p1[1])
+    if(xdelta == 0 and ydelta != 0):
+        x01_center = p0[0]
+        y01_center = center[1]
+    elif(ydelta == 0 and xdelta != 0):
+        x01_center = center[0]
+        y01_center = p0[1]
+    else:
+        m01 = ydelta / xdelta
+        c01 = p0[1] - p0[0] * m01
+        x01_center = (c01 - c_center) / (m01 - m_center)
+        y01_center = m01 * x01_center + c01
+
+
+    r1 = (x23_center, y23_center)
+    r2 = (x01_center, y01_center)
+    print("First point: {}, Second point: {}".format((x23_center, y23_center), (x01_center, y01_center)))
+
+    return r1, r2
+
+   
+
+
+
+
+
+
+
+def  gestureRecognize(ori, bgremoved):
+    # skin masking according to color
+    skinMask = cv2.cvtColor(ori, cv2.COLOR_BGR2HSV)
+    skinMask = cv2.GaussianBlur(skinMask, (gaussian_ksize, gaussian_ksize), 0)
+    skinMask = cv2.inRange(skinMask, lower, upper)
+    _, skinMask = cv2.threshold(skinMask, thresh_lower, 255, 0)
+    # showImg("skinMask", skinMask)
+    # skinMask = cv2.cvtColor(skinMask, cv2.COLOR_HSV2BGR)
+    print(skinMask.shape)
+
+    # dilation, erosion and multiplication
+    # kernel = np.ones((5,5),np.uint8)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11,11))
+    rgb = cv2.cvtColor(bgremoved, cv2.COLOR_GRAY2BGR)
+    # openedMask = cv2.dilate(eroded, kernel, iterations=1)
+    openedMask = cv2.morphologyEx(rgb, cv2.MORPH_OPEN, kernel)
+    openedMaskSingleChannel = cv2.cvtColor(openedMask, cv2.COLOR_BGR2GRAY)
+    # openedMask = cv2.erode(rgb, kernel, iterations=1)
+    # showImg("operated", openedMask)
+    
+    print(openedMask.shape)
+    openedMask = cv2.bitwise_and(openedMaskSingleChannel, skinMask, mask=openedMaskSingleChannel)
+    
+    # grayMask = cv2.cvtColor(openedMask, cv2.COLOR_BGR2GRAY)
+    grayMask = openedMask.copy()
+    openedMask = cv2.cvtColor(openedMask, cv2.COLOR_GRAY2BGR)
     _, contours, hierarchy = cv2.findContours(grayMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    # cv2.namedWindow("Img", cv2.WINDOW_NORMAL)
-    # rImage = cv2.resize(openedMask, (WIDTH,HEIGHT))
-    # cv2.moveWindow("Img", 500, 400)
-    # cv2.resizeWindow("Img", WIDTH, HEIGHT)
-    # cv2.imshow("Img", rImage)
-    # cv2.waitKey(1)
-
-    # showImg("contour after", img)
-
-    if(len(contours) == 0): return ori, openedMask, (0,0)
+    if(len(contours) == 0): return ori, openedMask, (0,0), 0
 
     # find contour with largest area (may not be necessary)
     max_area = 0
@@ -104,7 +206,7 @@ def  gestureRecognize(ori, mask):
             max_area = area
             indexOfLargestContour = i
 
-    if(max_area < 10000): return ori, openedMask, (0,0)
+    if(max_area < 10000): return ori, openedMask, (0,0), 0
     # else: print("max_area {}".format(max_area))
 
     largestContour = contours[indexOfLargestContour]
@@ -130,11 +232,34 @@ def  gestureRecognize(ori, mask):
 
     approxcontour = cv2.approxPolyDP(largestContour,0.008*cv2.arcLength(largestContour,True),True)
 
-    cv2.drawContours(openedMask, [approxcontour], 0, (0,255,0), 2)
-    cv2.drawContours(ori, [approxcontour], 0, (0,255,0), 2)
+    # cv2.drawContours(openedMask, [approxcontour], 0, (0,255,0), 2)
+    # cv2.drawContours(ori, [approxcontour], 0, (0,255,0), 2)
 
+    rect = cv2.minAreaRect(approxcontour)
+    box = cv2.boxPoints(rect)
+    box = np.int0(box)
+    for i in range(0,4): 
+        # print("{}: {}".format(i, box[i]))
+        if(box[i][0] >= 0 and box[i][1] >= 0): 
+            cv2.putText(openedMask, str(i), tuple(box[i]), cv2.FONT_HERSHEY_PLAIN, 1, (102,255,204), 2)
+            
+    arrR, id = findDividingLine(box, center)
 
-    # showImg("output image so far", rgbMask)
+    for i, r in zip(id,arrR):
+        if(r[0] >= 0 and r[1] >= 0): 
+            cv2.putText(openedMask, "r{}".format(i), r, cv2.FONT_HERSHEY_PLAIN, 1, (102,255,204), 2) 
+            # cv2.line(openedMask, center, r, (0,0,204),2)        
+
+    # if(r1[0] >= 0 and r1[1] >= 0): 
+    #     # cv2.putText(openedMask, "r1", r1, cv2.FONT_HERSHEY_PLAIN, 1, (102,255,204), 2) 
+    #     cv2.line(openedMask, center, r1, (102,255,204),2)
+    # if(r2[0] >= 0 and r2[1] >= 0):  
+    #     # cv2.putText(openedMask, "r2", r2, cv2.FONT_HERSHEY_PLAIN, 1, (102,255,204), 2) 
+    #     cv2.line(openedMask, center, r2, (102,255,204),2)
+    cv2.drawContours(openedMask,[box],0,(255,102,102),2)
+
+    
+
     hullIndices = cv2.convexHull(approxcontour, returnPoints=False)   
     convexityDefects = cv2.convexityDefects(approxcontour, hullIndices)
 
@@ -161,7 +286,7 @@ def  gestureRecognize(ori, mask):
 
         convexlineVector = np.array(endingPt) - np.array(startPt)
         convexlineLength = np.sqrt(convexlineVector.dot(convexlineVector))
-        # print "convex line {0} has length {1}".format(i,convexlineLength)
+
         lineLengthList.append(convexlineLength)
         startPtsList.append(startPt)
         endingPtList.append(endingPt)
@@ -181,19 +306,25 @@ def  gestureRecognize(ori, mask):
 
     for s,e,f,l,d in zip(startPtsList, endingPtList, farthestPtsList, lineLengthList, distanceList):
         # print "Length now is {0}, Distance is {1}".format(l, d)
-        cv2.line(ori, s, e, [0,255,0],2)
-        cv2.line(openedMask, s, e, [0,255,0],2)
-        if l < lineLength_avg and d > distance_avg:
+        cv2.line(openedMask, s, e, [255,190,0],2)
+        # if l < lineLength_avg and d > distance_avg:
             # print "Its drawn"
-            cv2.circle(ori, s, 10, [0,255,255],2)
-            cv2.circle(ori, e, 10, [0,255,255],2)
-            cv2.circle(ori, f, 5, [0,0,255], -1)
-            cv2.circle(openedMask, s, 10, [0,255,255],2)
-            cv2.circle(openedMask, e, 10, [0,255,255],2)
+        cv2.circle(ori, s, 10, [0,255,255],2)
+        cv2.circle(ori, e, 10, [0,255,255],2)
+        cv2.circle(ori, f, 5, [0,0,255], -1)
+        cv2.circle(openedMask, s, 10, [0,255,255],2)
+        cv2.circle(openedMask, e, 10, [0,255,255],2)
+        
+        if(findAngle(f,s,e) < maxAngle and l < lineLength_avg * 1.3): 
+            totalFingers += 1
             cv2.circle(openedMask, f, 5, [0,0,255], -1)
-        if(findAngle(f,s,e) < maxAngle): totalFingers += 1
+            cv2.line(openedMask, s, f, [0,255,0],2)
+            cv2.line(openedMask, f, e, [0,255,0],2)
 
-    return ori, openedMask, center
+
+
+
+    return ori, openedMask, center, totalFingers
 
     # TODO:
     # do motion gesture detection, check if hand has moved fast enough
@@ -206,7 +337,7 @@ def distance(pt1, pt2):
     # print(pt2)
     d = abs(pt1[0] - pt2[0])**2 +  abs(pt1[1] - pt2[1])**2
     m = math.sqrt(d)
-    return d
+    return m
 
 def videoRW(videoFileName):
     capturer = cv2.VideoCapture(videoFileName)
@@ -214,7 +345,11 @@ def videoRW(videoFileName):
     framect = capturer.get(cv2.CAP_PROP_FRAME_COUNT)
     print("Frames: ", framect," FPS: ", fps, " Length: ", framect / fps, " s")
 
-    backgroundSubtractor = cv2.createBackgroundSubtractorMOG2(history=history)
+    # not so good
+    # backgroundSubtractor = cv2.bgsegm.createBackgroundSubtractorMOG()
+
+    # better but need tweaking
+    backgroundSubtractor = cv2.createBackgroundSubtractorMOG2(history=history, varThreshold=10, detectShadows=True)
     backgroundSubtractor.setComplexityReductionThreshold(complexityReductionThreshold)
     backgroundSubtractor.setBackgroundRatio(backgroundRatio)
 
@@ -226,6 +361,7 @@ def videoRW(videoFileName):
     lastSpeed = 0
     minDistance = 1000000
     maxDistance = 0
+    noMovementCounter = 0
 
     i = 0
     while(True):
@@ -238,7 +374,7 @@ def videoRW(videoFileName):
         fgmask = backgroundSubtractor.apply(frame)
     
 
-        drawnOriginal, drawnMasked, center = gestureRecognize(frame, fgmask)
+        drawnOriginal, drawnMasked, center, fingers = gestureRecognize(frame, fgmask)
 
         d = 0
         s = 0
@@ -253,6 +389,17 @@ def videoRW(videoFileName):
             lastCenter = center
 
 
+        if(s < minSpeed):
+            noMovementCounter += 1
+            timeUnmoved = noMovementCounter / fps
+            if(timeUnmoved < timeLimit): 
+                steadyState = True
+                noMovementCounter = 0
+        else:
+            steadyState = False
+
+
+
 
         i += 1
   
@@ -264,20 +411,20 @@ def videoRW(videoFileName):
 
         cv2.namedWindow("Result", cv2.WINDOW_NORMAL)
         drawnMasked = cv2.resize(drawnMasked, (WIDTH,HEIGHT))
-        cv2.moveWindow("Result", 600, 100)
+        cv2.moveWindow("Result", 100, 100)
         cv2.resizeWindow("Result", WIDTH, HEIGHT)
 
 
-        waitTime = 1
-        cv2.putText(drawnMasked, "s: {}".format(int(s)), ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+        
+        cv2.putText(drawnMasked, "s: {}".format(int(s)), ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 2)
 
-        cv2.putText(drawnMasked, "lastCenter: {}".format(lastCenter), ((WIDTH - 200), (HEIGHT - 150)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+        cv2.putText(drawnMasked, "finger count: {}".format(fingers), ((WIDTH - 200), (HEIGHT - 150)), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 2)
 
-        cv2.putText(drawnMasked, "frame: {}".format(math.floor(framenum)), ((WIDTH - 200), (HEIGHT - 200)), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 2)
+        cv2.putText(drawnMasked, "frame: {}".format(math.floor(framenum)), ((WIDTH - 200), (HEIGHT - 200)), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255), 2)
 
 
         moveColor = (s / 2000) * 255
-        cv2.putText(drawnOriginal, "MOVED!" if (s > 600) else "", ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,moveColor), 2)
+        cv2.putText(drawnMasked, "MOVED!" if (s > minSpeed) else "", ((WIDTH - 200), (HEIGHT - 100)), cv2.FONT_HERSHEY_PLAIN, 1, (0,140,255), 3)
 
 
 
@@ -288,28 +435,17 @@ def videoRW(videoFileName):
         # cv2.imshow("Original", frame)
         # cv2.imshow("Mask", fgmask)
         cv2.imshow("Result", drawnMasked)
-        cv2.imshow("Original", drawnOriginal)
+        # cv2.imshow("Original", drawnOriginal)
         if(cv2.waitKey(waitTime) == 27): exit()
-        if(cv2.waitKey(waitTime) == 70): cv2.waitKey(0)
-
-
-        # print("{}".format(result.shape))
-        
-        # color = ('b','g','r')
-        # for i,col in enumerate(color):
-        
-
-        # showImg("FG", fgmask)
-
-
-
-
-    
 
 
 
 if __name__ == "__main__":
-    videoRW('vids/testcase1.mov')
+    # videoRW('vids/testcase_cut.mp4')
+    # videoRW('vids/testcase1.mov')
+    videoRW('vids/testcase2.mov')
+    # videoRW('vids/testcase3.mov')
+    # videoRW('vids/testcase_ext.mp4')
 
 
 
