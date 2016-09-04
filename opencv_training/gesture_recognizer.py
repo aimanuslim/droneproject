@@ -8,9 +8,6 @@ import math
 # Code based on tutorial on this website: http://creat-tabu.blogspot.my/2013/08/opencv-python-hand-gesture-recognition.html
 # Using angle idea based on: http://simena86.github.io/blog/2013/08/12/hand-tracking-and-recognition-with-opencv/
 
-# IMG_TO_BE_TESTED = "ok_sign.jpg"
-# IMG_TO_BE_TESTED = "imagex01.jpg"
-
 #TODO:
 # 1. Save state when there is no movement.
 # 2. Use hand gesture recognition from the new guy
@@ -82,6 +79,7 @@ def normalize(v):
     if norm==0: 
        return v
     return v/norm
+
 
 # p0 is the origin point
 # p1 and p2 are the points the lines are going to from p0

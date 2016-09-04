@@ -10,9 +10,19 @@ from threading import Thread
 from wx.lib.pubsub import setuparg1
 from wx.lib.pubsub import pub as Publisher
 import wx.lib.agw.pybusyinfo as PBI
+from GestureRecognizer.py import * 
 
 #from wx.lib.pubsub import Publisher
 MENU = ["Espresso", "Caffe Latte", "Cappuccino", "Americano", "Caffe Mocha", "Cafe au Lait"]
+
+# Added enum for commands
+class Command:
+	SUBMIT = 0
+	SELECT = 1
+	LEFT = 2
+	RIGHT = 3
+	IDLE = 4
+
 
 def main():
 	app = wx.PySimpleApp()
@@ -45,24 +55,38 @@ class GestureThread(Thread):
 		Currently the codes in here are just for testing
 		"""
 
-		for i in range(1,1000):
-			time.sleep(0.2)
-			print("Gesture Thread # {}. Modulo by 5 is {}".format(i, i % 5))
+		gr = GestureRecognizer(False)
+		gr.videoinit(0)
+		while(True):
+			command = Command.IDLE
+			gesture = gr.recognize(gr.readVideo())
+			if(gesture == Gesture.select): command = Command.SELECT
+			elif(gesture == Gesture.submit): command = Command.SUBMIT
+			elif(gr.handState == HandState.movingFast):
+					command = Command.RIGHT if gr.handMovementDirection == 'right' else Command.LEFT
 
-			if (i%5) == 0:
-				print("Entered next picture")
-				wx.CallAfter(Publisher.sendMessage,"next picture","")
-				#wx.CallAfter(Publisher().sendMessage,"next picture","")
 
-			if (i%12) == 0:
-				print("Selected this picture")
-				wx.CallAfter(Publisher.sendMessage,"select picture","")
-			  	#wx.CallAfter(Publisher().sendMessage,"select picture","")
 
-			if (i%17) == 0:
-				wx.CallAfter(Publisher.sendMessage,"send order","")
-				time.sleep(5)
-				#wx.CallAfter(Publisher().sendMessage,"send order","")
+
+		# Testing code down here...
+		# for i in range(1,1000):
+		# 	time.sleep(0.2)
+		# 	print("Gesture Thread # {}. Modulo by 5 is {}".format(i, i % 5))
+
+		# 	if (i%5) == 0:
+		# 		print("Entered next picture")
+		# 		wx.CallAfter(Publisher.sendMessage,"next picture","")
+		# 		#wx.CallAfter(Publisher().sendMessage,"next picture","")
+
+		# 	if (i%12) == 0:
+		# 		print("Selected this picture")
+		# 		wx.CallAfter(Publisher.sendMessage,"select picture","")
+		# 	  	#wx.CallAfter(Publisher().sendMessage,"select picture","")
+
+		# 	if (i%17) == 0:
+		# 		wx.CallAfter(Publisher.sendMessage,"send order","")
+		# 		time.sleep(5)
+		# 		#wx.CallAfter(Publisher().sendMessage,"send order","")
 
 #############################################################################
 
