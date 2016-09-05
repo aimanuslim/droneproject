@@ -10,19 +10,10 @@ from threading import Thread
 from wx.lib.pubsub import setuparg1
 from wx.lib.pubsub import pub as Publisher
 import wx.lib.agw.pybusyinfo as PBI
-from GestureRecognizer.py import * 
+from GestureRecognizer import * 
 
 #from wx.lib.pubsub import Publisher
 MENU = ["Espresso", "Caffe Latte", "Cappuccino", "Americano", "Caffe Mocha", "Cafe au Lait"]
-
-# Added enum for commands
-class Command:
-	SUBMIT = 0
-	SELECT = 1
-	LEFT = 2
-	RIGHT = 3
-	IDLE = 4
-
 
 def main():
 	app = wx.PySimpleApp()
@@ -45,6 +36,7 @@ class GestureThread(Thread):
 	def __init__(self):
 
 		# this time.sleep must be here
+		self.latency = 0
 		time.sleep(3)
 		Thread.__init__(self)
 		self.start()
@@ -55,15 +47,53 @@ class GestureThread(Thread):
 		Currently the codes in here are just for testing
 		"""
 
-		gr = GestureRecognizer(False)
-		gr.videoinit(0)
+		gr = GestureRecognizer(True)
+		counter = 0
+		commandExecuted = False
+		#gr.videoinit("/dev/video0")
+		gr.videoinit(-1)
 		while(True):
-			command = Command.IDLE
 			gesture = gr.recognize(gr.readVideo())
-			if(gesture == Gesture.select): command = Command.SELECT
-			elif(gesture == Gesture.submit): command = Command.SUBMIT
-			elif(gr.handState == HandState.movingFast):
-					command = Command.RIGHT if gr.handMovementDirection == 'right' else Command.LEFT
+
+			# if gr.handCenterSpeed != 0: print "Speed: {}".format(gr.handCenterSpeed)
+			#print "Steady time: {} Finger count: {}".format(gr.noMovementCounter, gr.fingerCount)
+
+			# gr.showProcessedFrames()
+			# timeoutCounter += 1
+			# if timeoutCounter > timeoutLimit: timeout = True
+			if(not commandExecuted):
+				if(gesture == Gesture.select): 
+					print("Made selection")
+					wx.CallAfter(Publisher.sendMessage,"make selection","")
+					wx.MilliSleep(self.latency)
+					commandExecuted = True
+				
+				elif(gesture == Gesture.submit): 
+					print("Sent order")
+					wx.CallAfter(Publisher.sendMessage,"send order","")
+					wx.MilliSleep(self.latency)
+					time.sleep(3)
+					commandExecuted = True	
+				
+				elif(gr.handState == HandState.movingFast):
+					if(gr.handMovementDirection == 'right'):
+						print("PREVIOUS PIC!")
+						wx.CallAfter(Publisher.sendMessage,"previous picture","")
+						wx.MilliSleep(self.latency)
+					else:
+						print("NEXT PIC!")
+						wx.CallAfter(Publisher.sendMessage,"next picture","")
+						wx.MilliSleep(self.latency)
+		 					# command = Command.RIGHT if gr.handMovementDirection == 'right' else Command.LEFT
+		 			commandExecuted = True
+	 		else:
+	 			counter += 1
+	 			if(counter > 20):
+	 				counter = 0
+	 				commandExecuted = False
+	 				print("counter reset")
+
+
 
 
 
@@ -143,11 +173,10 @@ class ViewerPanel(wx.Panel):
 		self.softBlue = "#46C6F3"
 		self.green = "#09C595"
 		self.picPaths = []
-		self.checkBoxPath = os.getcwd() + "/img_src/" + "check_box.jpg"
 		self.currentPicture = 0
 		self.selectedPictures = []
 		self.totalPictures = 0
-		self.photoMaxSize = width/2
+		self.photoMaxSize = width - 800
 		print("photomax size is {}".format(self.photoMaxSize))
 		self.arduino = RadioThread()
 
@@ -164,21 +193,8 @@ class ViewerPanel(wx.Panel):
 		print("Subscribed to unselectPicture")
 		Publisher.subscribe(self.sendOrder,("send order"))
 		print("Subscribed to sendOrder")
-
-		"""
-		Publisher().subscribe(self.updateImages, ("update images"))
-		print("Subscribed to updateImages")
-		Publisher().subscribe(self.nextPicture,("next picture"))
-		print("Subscribed to nextPicture")
-		Publisher().subscribe(self.previousPicture,("previous picture"))
-		print("Subscribed to prevPicture")
-		Publisher().subscribe(self.selectPicture,("select picture"))
-		print("Subscribed to selectPicture")
-		Publisher().subscribe(self.unselectPicture,("unselect picture"))
-		print("Subscribed to unselectPicture")
-		Publisher().subscribe(self.sendOrder,("send order"))
-		print("Subscribed to sendOrder")
-		"""
+		Publisher.subscribe(self.makeSelection,("make selection"))
+		print("Subscribed to makeSelection")
 
 		self.layout()
 		
@@ -335,6 +351,12 @@ class ViewerPanel(wx.Panel):
 		print(self.selectedPictures)
 		self.loadOrderSent(order)
 
+	def makeSelection(self,msg):
+		if self.selectedPictures[self.currentPicture] is True:
+			self.unselectPicture("")
+
+		else:
+			self.selectPicture("")
 
 
 ########################################################################
@@ -354,8 +376,8 @@ class ViewerFrame(wx.Frame):
 		self.openDirectory()
 		
 		self.Show()
-		#self.Maximize(True)
-		self.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
+		self.Maximize(True)
+		#self.ShowFullScreen(True, style=wx.FULLSCREEN_ALL)
 		self.sizer.Fit(self)
 		GestureThread()
 		self.Center()
@@ -365,8 +387,8 @@ class ViewerFrame(wx.Frame):
 		self.folderPath = os.getcwd()
 		print(self.folderPath)
 		picPaths = sorted(glob.glob(self.folderPath + "/img_src/" + "/0*.jpg"))
-		print picPaths
-		print(len(picPaths))
+		# print picPaths
+		# print(len(picPaths))
 		Publisher.sendMessage("update images", picPaths)
 		#Publisher().sendMessage("update images", picPaths)
 		

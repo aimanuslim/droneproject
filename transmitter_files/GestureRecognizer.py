@@ -8,7 +8,8 @@ import math
 
 # CONSTANTS
 UNLOCATED = (0,0)
-MINCONTOURSIZE = 100000
+# MINCONTOURSIZE = 100000
+MINCONTOURSIZE = 100000 / 6
 NOCONTOURFOUND = None
 
 # drawing parameters
@@ -34,9 +35,9 @@ kernel_dim = 15
 
 # frame analysis parameters
 newCenterInterval = 13
-steadySpeed = 5
-barelyMovingSpeed = 28
-minNoMovementTimeLimit = 10
+steadySpeed = 5 
+barelyMovingSpeed = 13
+minNoMovementTimeLimit = 5
 # minMovementTimeLimit = 10
 
 # convex hull operations constants
@@ -61,6 +62,7 @@ class GestureRecognizer:
 	
 
 	def __init__(self, verbose):
+
 		self.verbose_mode = verbose
 		self.initializebgSubtractor()
 		self.skinMask = None
@@ -82,6 +84,8 @@ class GestureRecognizer:
 		self.handMovementDirection = None
 		self.currentgesture = Gesture.incomprehensible
 		self.fingerCount = 0
+		# self.determineMovementDelay = 0
+		# self.movementDelayLimit = 4
 
 	def normalize(self,v):
 		norm=np.linalg.norm(v)
@@ -102,14 +106,32 @@ class GestureRecognizer:
 
 	def videoinit(self, video):
 		self.videoObj = cv2.VideoCapture(video)
+		self.videoObj.set(cv2.CAP_PROP_FPS, 30)
+		#self.videoObj.open(video)
+		if(self.verbose_mode): 
+			if not self.videoObj.isOpened():
+				print("Video failed to open!")
+				self.exit()
+		#self.fps = 10
 		self.fps = self.videoObj.get(cv2.CAP_PROP_FPS) * 0.1
-		self.totalframes = self.videoObj.get(cv2.CAP_PROP_FRAME_COUNT)
+		# self.totalframes = self.videoObj.get(cv2.CAP_PROP_FRAME_COUNT)
+		print("Listening.....")
 
 	def readVideo(self):
 		ret, frame = self.videoObj.read()
+		if(not ret): 
+			print("Failed to read frame")
+			self.exit()
 		if(self.verbose_mode):
-			print("Reading frame {} of video with {} FPS".format(videoObj.get(cv2.CAP_PROP_POS_FRAMES), self.fps))
-		if(not ret): self.exit()
+			pass
+			# print("Reading frame {} of video with {} FPS".format(self.videoObj.get(cv2.CAP_PROP_POS_FRAMES), self.fps))
+
+		# winname =  "Frame"
+		# img = frame
+		# cv2.namedWindow(winname, cv2.WINDOW_NORMAL)
+		# cv2.resizeWindow(winname, WIDTH, HEIGHT)
+		# cv2.imshow(winname, img)
+		# print "."
 		return frame
 
 	def extractSkinContour(self, frame):
@@ -227,8 +249,8 @@ class GestureRecognizer:
 				else:
 					self.fingerCount += 1
 
-		if(self.fingerCount == 2 and self.handState == HandState.steady): self.currentgesture = Gesture.select
-		elif(self.fingerCount == 5 and self.handState == HandState.steady): self.currentgesture = Gesture.submit
+		if(self.fingerCount == 3 and self.handState == HandState.steady): self.currentgesture = Gesture.select
+		elif(self.fingerCount > 4 and self.handState == HandState.steady): self.currentgesture = Gesture.submit
 		else: 
 			self.currentgesture = Gesture.incomprehensible
 		return self.currentgesture
@@ -269,6 +291,17 @@ class GestureRecognizer:
 
 		self.findHandCenter()
 		self.determineHandMovement()
+
+		# if self.determineMovementDelay <= 2:
+		# 	self.determineHandMovement()
+		# 	self.determineMovementDelay += 1
+
+		# else:
+		# 	if self.determineMovementDelay == self.movementDelayLimit:
+		# 		self.determineMovementDelay = 0
+		# 	else:
+		# 		self.determineMovementDelay += 1
+
 		return self.handMovementDirection if self.handState == HandState.movingFast else self.determineGesture()
 
 
@@ -306,7 +339,7 @@ if __name__ == "__main__":
 	gr.videoinit('vids/testcase5.mov')
 	while(True):
 		gesture = gr.recognize(gr.readVideo())
-		if(gr.verbose_mode) gr.showProcessedFrames()
+		if(gr.verbose_mode): gr.showProcessedFrames()
 	
 
 
