@@ -5,7 +5,7 @@ import os
 import wx
 import sys
 import time
-import serial
+import socket
 from threading import Thread
 from wx.lib.pubsub import setuparg1
 from wx.lib.pubsub import pub as Publisher
@@ -36,9 +36,8 @@ class GestureThread(Thread):
 	def __init__(self):
 
 		# this time.sleep must be here
-		self.latency = 0
-		time.sleep(3)
 		Thread.__init__(self)
+		self.latency = 0
 		self.start()
 
 	def run(self):
@@ -120,46 +119,25 @@ class GestureThread(Thread):
 
 #############################################################################
 
-class RadioThread(Thread):
+class WifiClass(Thread):
 	def __init__(self):
 		Thread.__init__(self)
 
-		print("Creating my Arduino object...............")
+		self.serverSocket = socket.socket()
+		self.port = 11850
 
-		self.serialPort = glob.glob("/dev/ttyUSB*")[0]
-		self.baudRate = 9600
-		
-		# Establish serial connection with Arduino
-		print("Initiating serial port connection")
-		self.arduinoSerial = serial.Serial(self.serialPort,self.baudRate)
-		
-		# Testing connection
-		# Upon successful connection, Arduino will give out 3 short beeps
-		# and return "OK"
-		print("Testing serial connection.....")
-		time.sleep(3)
-		self.arduinoSerial.write("xxxx")
+		self.serverSocket.bind(("",self.port))
+		self.serverSocket.listen(5)
 
-		# Test to see if Arduino returns "OK" to acknowledge connection
-		print("Waiting for reply from arduino.....")
-		time.sleep(2)
-		reply = self.arduinoSerial.readline().rstrip()
-		
-		if reply == "OK":
-			print("SUCCESS. Serial connection with Arduino on {} with speed {}".format(self.serialPort,self.baudRate))
-
-		else:
-			print("FAIL. Serial connection with Arduino on {} with speed {}".format(self.serialPort,self.baudRate))
-		self.start()
+		self.clientSocket, self.clientAddr = self.serverSocket.accept()
+		print("Got connection from {}".format(self.clientAddr))
 
 	def run(self):
-		print("Arduino is listening on serial.")
+		print("wifiAdapter reading to transmit...")
 
-	def writeToArduino(self, msg):
-
-		# send message to arduino via Serial
-		self.arduinoSerial.write(msg)
-		print("Sent {} to Arduino!".format(msg))
+	def sendToClient(self, msg):
+		self.clientSocket.send(msg)
+		print("Sent {} to Client!".format(msg))
 
 
 class ViewerPanel(wx.Panel):
@@ -178,7 +156,7 @@ class ViewerPanel(wx.Panel):
 		self.totalPictures = 0
 		self.photoMaxSize = width - 800
 		print("photomax size is {}".format(self.photoMaxSize))
-		self.arduino = RadioThread()
+		self.wifiAdapter = WifiClass()
 
 
 		Publisher.subscribe(self.updateImages, ("update images"))
@@ -256,7 +234,7 @@ class ViewerPanel(wx.Panel):
 	def loadOrderSent(self,order):
 		print("Entered order sent!")
 
-		self.arduino.writeToArduino(order)
+		self.wifiAdapter.sendToClient(order)
 
 		dlgTitle = "Processing order"
 		dlgMessage = "Please be patient while we process your order"
@@ -332,7 +310,7 @@ class ViewerPanel(wx.Panel):
 	def sendOrder(self, msg):
 
 		"""
-		Convert the selectedPictures list into string and send this string to the RadioThread Object
+		Convert the selectedPictures list into string and send this string to the WifiClass Object
 		Set all the elements in selectedPictures to false
 
 		"""
