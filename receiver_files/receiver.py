@@ -1,19 +1,15 @@
 #!/usr/bin/env python
 
-import RPi.GPIO as GPIO
 import time
-import spidev
 import os
 import wx
 import Queue
+import socket
+import sys
 import wx.grid as gridlib
 from threading import Thread
-from lib_nrf24 import NRF24
 from wx.lib.pubsub import pub
 import wx.lib.agw.fourwaysplitter as fws
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
 
 MENU = ["Espresso", "Caffe Latte", "Cappuccino", "Americano", "Caffe Mocha", "Cafe au Lait"]
 
@@ -33,52 +29,35 @@ class RadioThread(Thread):
 		Thread.__init__(self)
 		#addresses for communication with transmitter
 		self.messageQueue = Queue.Queue()
+		self.receivedMessage = ""
 
-		self.pipes = [[0xE8, 0xE8, 0xF0, 0xF0, 0xE1], [0xF0, 0xF0, 0xF0, 0xF0, 0xE1]]
-		self.radio = NRF24(GPIO, spidev.SpiDev())
-		self.receivedMessage = []
-		self.stringMessage = ""
-		#arguments are (CSN,CE) pins
-		self.radio.begin(0,17)
-		self.radio.setPayloadSize(32)
-		self.radio.setChannel(0x76)
-
-		# better range with lower transfer rate)
-		self.radio.setDataRate(NRF24.BR_1MBPS)
-
-		self.radio.setPALevel(NRF24.PA_MAX)
-
-		self.radio.setAutoAck(True)
-		self.radio.enableDynamicPayloads()
-		self.radio.enableAckPayload()
-
-		self.radio.openReadingPipe(1,self.pipes[1])
-		#self.radio.printDetails()
-
-		#start listening to incoming messages
-		self.radio.startListening()
+		self.serverIP = "192.168.150.1"
+		self.port = 11850
+		self.msgSize = 1024
+		self.clientSocket = socket.socket()
 		self.start()
 	
 	def run(self):
 		while True:
-			while not self.radio.available(0):
-					time.sleep(1/100)
+			try:
+				print("Trying")
+				self.clientSocket.connect((self.serverIP,self.port))
+			except:
+				print("Server not started yet. Sleeping....")
+				time.sleep(5)
+				continue
 
+			print("Connected to server!")
+			break
 
-			self.receivedMessage = []
-			self.radio.read(self.receivedMessage, self.radio.getDynamicPayloadSize())
-
-			#Decode into standard unicode set
-			self.stringMessage = ""
-
-			for n in self.receivedMessage:
-				if (n >= 32 and n<= 126):
-						self.stringMessage += chr(n)
-
-			print("Message decodes to : {}".format(self.stringMessage))
-			self.messageQueue.put(self.stringMessage)
-
-			wx.CallAfter(pub.sendMessage,"update panel",message = self.messageQueue.get())
+		while True:
+			self.receivedMessage = self.clientSocket.recv(self.msgSize)
+			if self.receivedMessage is "":
+				continue
+			
+			else:
+				self.messageQueue.put(self.receivedMessage)
+				wx.CallAfter(pub.sendMessage,"update panel",message = self.messageQueue.get())
 
 
 class OrderPanel(wx.Panel):

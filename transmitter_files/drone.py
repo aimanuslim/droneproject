@@ -46,51 +46,51 @@ class GestureThread(Thread):
 		Currently the codes in here are just for testing
 		"""
 
-		gr = GestureRecognizer(True)
-		counter = 0
-		commandExecuted = False
-		#gr.videoinit("/dev/video0")
-		gr.videoinit(-1)
-		while(True):
-			gesture = gr.recognize(gr.readVideo())
+		# gr = GestureRecognizer(True)
+		# counter = 0
+		# commandExecuted = False
+		# #gr.videoinit("/dev/video0")
+		# gr.videoinit(-1)
+		# while(True):
+		# 	gesture = gr.recognize(gr.readVideo())
 
-			# if gr.handCenterSpeed != 0: print "Speed: {}".format(gr.handCenterSpeed)
-			#print "Steady time: {} Finger count: {}".format(gr.noMovementCounter, gr.fingerCount)
+		# 	# if gr.handCenterSpeed != 0: print "Speed: {}".format(gr.handCenterSpeed)
+		# 	#print "Steady time: {} Finger count: {}".format(gr.noMovementCounter, gr.fingerCount)
 
-			# gr.showProcessedFrames()
-			# timeoutCounter += 1
-			# if timeoutCounter > timeoutLimit: timeout = True
-			if(not commandExecuted):
-				if(gesture == Gesture.select): 
-					print("Made selection")
-					wx.CallAfter(Publisher.sendMessage,"make selection","")
-					wx.MilliSleep(self.latency)
-					commandExecuted = True
+		# 	# gr.showProcessedFrames()
+		# 	# timeoutCounter += 1
+		# 	# if timeoutCounter > timeoutLimit: timeout = True
+		# 	if(not commandExecuted):
+		# 		if(gesture == Gesture.select): 
+		# 			print("Made selection")
+		# 			wx.CallAfter(Publisher.sendMessage,"make selection","")
+		# 			wx.MilliSleep(self.latency)
+		# 			commandExecuted = True
 				
-				elif(gesture == Gesture.submit): 
-					print("Sent order")
-					wx.CallAfter(Publisher.sendMessage,"send order","")
-					wx.MilliSleep(self.latency)
-					time.sleep(3)
-					commandExecuted = True	
+		# 		elif(gesture == Gesture.submit): 
+		# 			print("Sent order")
+		# 			wx.CallAfter(Publisher.sendMessage,"send order","")
+		# 			wx.MilliSleep(self.latency)
+		# 			time.sleep(3)
+		# 			commandExecuted = True	
 				
-				elif(gr.handState == HandState.movingFast):
-					if(gr.handMovementDirection == 'right'):
-						print("PREVIOUS PIC!")
-						wx.CallAfter(Publisher.sendMessage,"previous picture","")
-						wx.MilliSleep(self.latency)
-					else:
-						print("NEXT PIC!")
-						wx.CallAfter(Publisher.sendMessage,"next picture","")
-						wx.MilliSleep(self.latency)
-		 					# command = Command.RIGHT if gr.handMovementDirection == 'right' else Command.LEFT
-		 			commandExecuted = True
-	 		else:
-	 			counter += 1
-	 			if(counter > 20):
-	 				counter = 0
-	 				commandExecuted = False
-	 				print("counter reset")
+		# 		elif(gr.handState == HandState.movingFast):
+		# 			if(gr.handMovementDirection == 'right'):
+		# 				print("PREVIOUS PIC!")
+		# 				wx.CallAfter(Publisher.sendMessage,"previous picture","")
+		# 				wx.MilliSleep(self.latency)
+		# 			else:
+		# 				print("NEXT PIC!")
+		# 				wx.CallAfter(Publisher.sendMessage,"next picture","")
+		# 				wx.MilliSleep(self.latency)
+		#  					# command = Command.RIGHT if gr.handMovementDirection == 'right' else Command.LEFT
+		#  			commandExecuted = True
+	 # 		else:
+	 # 			counter += 1
+	 # 			if(counter > 20):
+	 # 				counter = 0
+	 # 				commandExecuted = False
+	 # 				print("counter reset")
 
 
 
@@ -98,24 +98,24 @@ class GestureThread(Thread):
 
 
 		# Testing code down here...
-		# for i in range(1,1000):
-		# 	time.sleep(0.2)
-		# 	print("Gesture Thread # {}. Modulo by 5 is {}".format(i, i % 5))
+		for i in range(1,1000):
+			time.sleep(1)
+			print("Gesture Thread # {}. Modulo by 5 is {}".format(i, i % 5))
 
-		# 	if (i%5) == 0:
-		# 		print("Entered next picture")
-		# 		wx.CallAfter(Publisher.sendMessage,"next picture","")
-		# 		#wx.CallAfter(Publisher().sendMessage,"next picture","")
+			if (i%5) == 0:
+				print("Entered next picture")
+				wx.CallAfter(Publisher.sendMessage,"next picture","")
+				#wx.CallAfter(Publisher().sendMessage,"next picture","")
 
-		# 	if (i%12) == 0:
-		# 		print("Selected this picture")
-		# 		wx.CallAfter(Publisher.sendMessage,"select picture","")
-		# 	  	#wx.CallAfter(Publisher().sendMessage,"select picture","")
+			if (i%12) == 0:
+				print("Selected this picture")
+				wx.CallAfter(Publisher.sendMessage,"select picture","")
+			  	#wx.CallAfter(Publisher().sendMessage,"select picture","")
 
-		# 	if (i%17) == 0:
-		# 		wx.CallAfter(Publisher.sendMessage,"send order","")
-		# 		time.sleep(5)
-		# 		#wx.CallAfter(Publisher().sendMessage,"send order","")
+			if (i%17) == 0:
+				wx.CallAfter(Publisher.sendMessage,"send order","")
+				time.sleep(5)
+				#wx.CallAfter(Publisher().sendMessage,"send order","")
 
 #############################################################################
 
@@ -125,16 +125,16 @@ class WifiClass(Thread):
 
 		self.serverSocket = socket.socket()
 		self.port = 11850
-
 		self.serverSocket.bind(("",self.port))
 		self.serverSocket.listen(5)
-
-		self.clientSocket, self.clientAddr = self.serverSocket.accept()
-		print("Got connection from {}".format(self.clientAddr))
+		self.clientSocket = ""
+		self.clientAddr = ""
+		self.start()
 
 	def run(self):
-		print("wifiAdapter reading to transmit...")
-
+		print("wifiAdapter ready to transmit...")
+		self.clientSocket, self.clientAddr = self.serverSocket.accept()
+	
 	def sendToClient(self, msg):
 		self.clientSocket.send(msg)
 		print("Sent {} to Client!".format(msg))
@@ -143,9 +143,7 @@ class WifiClass(Thread):
 class ViewerPanel(wx.Panel):
 
 	def __init__(self, parent):
-		time.sleep(3)
 		wx.Panel.__init__(self, parent)
-		
 		width, height = wx.DisplaySize()
 		print("Screen is {} x {}".format(width,height))
 		self.softBlue = "#46C6F3"
@@ -156,8 +154,6 @@ class ViewerPanel(wx.Panel):
 		self.totalPictures = 0
 		self.photoMaxSize = width - 800
 		print("photomax size is {}".format(self.photoMaxSize))
-		self.wifiAdapter = WifiClass()
-
 
 		Publisher.subscribe(self.updateImages, ("update images"))
 		print("Subscribed to updateImages")
@@ -175,6 +171,7 @@ class ViewerPanel(wx.Panel):
 		print("Subscribed to makeSelection")
 
 		self.layout()
+		self.wifiAdapter = WifiClass()
 		
 	#----------------------------------------------------------------------
 
