@@ -39,6 +39,9 @@ steadySpeed = 5
 barelyMovingSpeed = 13
 minNoMovementTimeLimit = 5
 # minMovementTimeLimit = 10
+MINPRESENTINFRAMETIME = 5
+PRESENTINFRAME = True
+ABSENTINFRAME = False
 
 # convex hull operations constants
 epsilon = 0.01
@@ -84,6 +87,7 @@ class GestureRecognizer:
 		self.handMovementDirection = None
 		self.currentgesture = Gesture.incomprehensible
 		self.fingerCount = 0
+		self.handPresentTimer = 0
 		# self.determineMovementDelay = 0
 		# self.movementDelayLimit = 4
 
@@ -262,7 +266,10 @@ class GestureRecognizer:
 		hullIndices = cv2.convexHull(contour, returnPoints=False)
 		self.convexityDefects = cv2.convexityDefects(contour, hullIndices)
 
-
+	def checkHandPresenceTimer(self):
+		self.handPresentTimer += 1
+		if(self.handPresentTimer > MINPRESENTINFRAMETIME): return PRESENTINFRAME
+		else: ABSENTINFRAME
 
 	def recognize(self, frame):
 		if(frame == None): return 
@@ -274,11 +281,13 @@ class GestureRecognizer:
 		resultMaskcopy = self.resultMask.copy()
 		_, contours, hierarchy = cv2.findContours(resultMaskcopy, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
+		# handPresentTimer gets reset every time incomprehensible is returned
 		if(len(contours) == 0): 
 			self.handCenter = UNLOCATED
 			self.handCenterSpeed = 0
 			self.handState = HandState.absent
 			self.fingerCount = 0
+			self.handPresentTimer = 0 
 			return Gesture.incomprehensible
 		else: 
 			self.largestResultContour = self.findLargestContour(contours)
@@ -287,10 +296,14 @@ class GestureRecognizer:
 				self.handCenterSpeed = 0
 				self.handState = HandState.absent
 				self.fingerCount = 0
+				self.handPresentTimer = 0
 				return Gesture.incomprehensible 
 
 		self.findHandCenter()
-		self.determineHandMovement()
+		self.currentgesture = Gesture.incomprehensible # default
+		if self.checkHandPresenceTimer() == PRESENTINFRAME: 
+			self.determineHandMovement()
+			return self.handMovementDirection if self.handState == HandState.movingFast else self.determineGesture()
 
 		# if self.determineMovementDelay <= 2:
 		# 	self.determineHandMovement()
@@ -301,8 +314,6 @@ class GestureRecognizer:
 		# 		self.determineMovementDelay = 0
 		# 	else:
 		# 		self.determineMovementDelay += 1
-
-		return self.handMovementDirection if self.handState == HandState.movingFast else self.determineGesture()
 
 
 	def showProcessedFrames(self):
